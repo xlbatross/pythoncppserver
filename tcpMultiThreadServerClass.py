@@ -57,53 +57,16 @@ class TCPMultiThreadServer:
 
     # 데이터 송신
     # 데이터 송신은 이 메소드를 통해서만 전달된다.
-    def send(self, cSock : socket.socket, data):
-        self.sendClient(cSock=cSock, data=data) # 단일 클라이언트에 데이터 송신
-    
-    # # 데이터 수신
-    # def receive(self, rSock : socket.socket = None):
-    #     cAddr = rSock.getpeername() # 데이터를 수신할 클라이언트의 어드레스
-    #     try:
-    #         headerString : str = ""
-    #         while True:
-    #             headerPacket = rSock.recv(1024) # 서버로부터 1024바이트 헤더 데이터를 수신받는다.
-    #             if not headerPacket:
-    #                 raise # 오류 발생
-    #             print("in")
-    #             headerString = headerPacket.decode()
-    #             if "packetSize" in headerString:
-    #                 break
+    # def send(self, cSock : socket.socket, data):
+    #     self.sendClient(cSock=cSock, data=data) # 단일 클라이언트에 데이터 송신
 
-    #         headerStringArray = headerString.split("|")
-    #         headerInfo = {}
-    #         for info in headerStringArray:
-    #             if "packetSize" in info:
-    #                 headerInfo["packetSize"] = int(info[len("packetSize") + 1:])
-    #             elif "dataType" in info:
-    #                 headerInfo["dataType"] = info[len("dataType") + 1:]
-    #             elif "width" in info:
-    #                 headerInfo["width"] = int(info[len("width") + 1:])
-    #             elif "height" in info:
-    #                 headerInfo["height"] = int(info[len("height") + 1:])
-    #             elif "channels" in info:
-    #                 headerInfo["channels"] = int(info[len("channels") + 1:])
-            
-    #         receiveBytes = bytearray() 
-    #         for i in range(headerInfo["packetSize"]):
-    #             packet = rSock.recv(1024) # 서버로부터 데이터를 수신받는다.
-    #             if not packet: # 수신한 데이터가 없으면
-    #                 raise # 오류 발생
-    #             receiveBytes.extend(packet)
-            
-    #         data = None
-    #         if headerInfo["dataType"] == "image":
-    #             data = np.ndarray(shape=(headerInfo["height"], headerInfo["width"], headerInfo["channels"]), buffer=receiveBytes, dtype=np.uint8)  # 수신받은 데이터를 바이트 바이너리에서 
-    #         return data # 변환된 데이터를 반환
-    #     except Exception as e:
-    #         rSock.close() # 클라이언트와 연결된 소켓을 닫고
-    #         self.disconnect(cAddr) # 해당 클라이언트의 정보를 해제한다.
-    #         print(e)
-    #         return None
+    def send(self, cSock : socket.socket, data : bytes):
+        if self.connected:
+            cSock.sendall(len(data).to_bytes(4, "little"))
+            cSock.sendall(data)
+            return True
+        else:
+            return False
 
     # 데이터 수신
     def receive(self, rSock : socket.socket = None):
@@ -113,41 +76,32 @@ class TCPMultiThreadServer:
             packet = rSock.recv(4)
             if not packet: # 수신한 데이터가 없으면
                 raise # 오류 발생
-            dataSize = int.from_bytes(packet, "big")
+            dataSize = int.from_bytes(packet, "little")
 
-            receiveheaderBytes = bytearray()
-            while len(receiveheaderBytes) < dataSize:
-                packetSize = 1024 if len(receiveheaderBytes) + 1024 < dataSize else dataSize - len(receiveheaderBytes)
+            headerBytes = bytearray()
+            while len(headerBytes) < dataSize:
+                packetSize = 1024 if len(headerBytes) + 1024 < dataSize else dataSize - len(headerBytes)
                 packet = rSock.recv(packetSize) # 서버로부터 데이터를 수신받는다.
                 if not packet: # 수신한 데이터가 없으면
                     raise # 오류 발생
-                receiveheaderBytes.extend(packet)
+                headerBytes.extend(packet)
             ######
 
             # 실제 데이터를 받는다.
             packet : bytes = rSock.recv(4)
             if not packet: # 수신한 데이터가 없으면
                 raise # 오류 발생
-            dataSize = int.from_bytes(packet, "big")
+            dataSize = int.from_bytes(packet, "little")
 
-            receiveBytes = bytearray()
-            while len(receiveBytes) < dataSize:
-                packetSize = 4096 if len(receiveBytes) + 4096 < dataSize else dataSize - len(receiveBytes)
+            dataBytes = bytearray()
+            while len(dataBytes) < dataSize:
+                packetSize = 4096 if len(dataBytes) + 4096 < dataSize else dataSize - len(dataBytes)
                 packet = rSock.recv(packetSize) # 서버로부터 데이터를 수신받는다.
                 if not packet: # 수신한 데이터가 없으면
                     raise # 오류 발생
-                receiveBytes.extend(packet)
-            
-            data = None
-            dataType = int.from_bytes(receiveheaderBytes[0:4], "little")
-            if dataType == 1:
-                # byteData = base64.b64decode(jsonData["data"])
-                height = int.from_bytes(receiveheaderBytes[4:8], "little")
-                width = int.from_bytes(receiveheaderBytes[8:12], "little")
-                channels = int.from_bytes(receiveheaderBytes[12:16], "little")
-                data = np.ndarray(shape=(height, width, channels), buffer=receiveBytes, dtype=np.uint8)
-            return data # 변환된 데이터를 반환
-
+                dataBytes.extend(packet)
+        
+            return (headerBytes, dataBytes)
         except Exception as e:
             rSock.close() # 클라이언트와 연결된 소켓을 닫고
             self.disconnect(cAddr) # 해당 클라이언트의 정보를 해제한다.
@@ -157,5 +111,12 @@ class TCPMultiThreadServer:
     # 요청 데이터 처리
     # 클라이언트에서 수신받은 요청 데이터의 타입을 구분하여 처리하고
     # 처리된 데이터를 반환하는 함수
-    def processData(self, cSock : socket.socket, data):
-        pass
+    def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytes : bytearray):
+        dataType = int.from_bytes(headerBytes[0:4], "little")
+        if dataType == 1:
+            height = int.from_bytes(headerBytes[4:8], "little")
+            width = int.from_bytes(headerBytes[8:12], "little")
+            channels = int.from_bytes(headerBytes[12:16], "little")
+            img = np.ndarray(shape=(height, width, channels), buffer=dataBytes, dtype=np.uint8)
+        return headerBytes, dataBytes
+

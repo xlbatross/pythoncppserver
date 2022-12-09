@@ -3,17 +3,23 @@ from threading import Thread
 import cv2
 import numpy as np
 import time
+import mediapipe as mp
 
 # 생성된 쓰레드에서 반복적으로 처리할 함수
 # 클라이언트에서 데이터가 수신되면 서버는 요청을 처리하고 처리 결과 데이터에 따라 특정 클라이언트에 데이터를 송신한다 .
 def handler(server : TCPMultiThreadServer, cSock):
     while True:
-        data = server.receive(cSock)
-        if type(data) != np.ndarray:
-            cv2.destroyWindow("receive")
+        headerBytes, dataBytes = server.receive(cSock)
+        if not headerBytes or not dataBytes:
             break
-        cv2.imshow("receive", data)
-        cv2.waitKey(1)
+        headerBytes, dataBytes = server.processData(cSock=cSock, headerBytes=headerBytes, dataBytes=dataBytes)
+        server.send(cSock, headerBytes)
+        server.send(cSock, dataBytes)
+        # if type(data) != np.ndarray:
+        #     break
+        # plot.imshow(data)
+        # plot.show()
+        # cv2.waitKey(1)
         # processData = server.processData(cSock=cSock, data=data)
         # server.send(cSock=cSock, data=processData)
 
