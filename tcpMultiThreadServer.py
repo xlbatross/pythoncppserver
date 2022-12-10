@@ -8,13 +8,27 @@ import mediapipe as mp
 # 생성된 쓰레드에서 반복적으로 처리할 함수
 # 클라이언트에서 데이터가 수신되면 서버는 요청을 처리하고 처리 결과 데이터에 따라 특정 클라이언트에 데이터를 송신한다 .
 def handler(server : TCPMultiThreadServer, cSock):
-    while True:
-        headerBytes, dataBytes = server.receive(cSock)
-        if not headerBytes or not dataBytes:
-            break
-        headerBytes, dataBytes = server.processData(cSock=cSock, headerBytes=headerBytes, dataBytes=dataBytes)
-        server.send(cSock, headerBytes)
-        server.send(cSock, dataBytes)
+    mp_drawing = mp.solutions.drawing_utils
+    mp_drawing_styles = mp.solutions.drawing_styles
+    mp_face_mesh = mp.solutions.face_mesh
+
+    with mp_face_mesh.FaceMesh(
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5) as face_mesh:
+        while True:
+            headerBytes, dataBytesList = server.receive(cSock)
+            if not headerBytes or not dataBytesList:
+                break
+            headerBytes, dataBytesList = server.processData(
+                cSock=cSock, headerBytes=headerBytes, dataBytesList=dataBytesList, 
+                mp_face_mesh=mp_face_mesh, 
+                face_mesh=face_mesh,
+                mp_drawing=mp_drawing,
+                mp_drawing_styles = mp_drawing_styles
+            )
+            server.send(cSock, headerBytes, dataBytesList)
         # if type(data) != np.ndarray:
         #     break
         # plot.imshow(data)

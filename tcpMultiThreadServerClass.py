@@ -2,8 +2,7 @@ import socket
 import pickle
 import numpy as np
 import cv2
-import json
-import base64
+
 
 class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
@@ -60,7 +59,7 @@ class TCPMultiThreadServer:
     # def send(self, cSock : socket.socket, data):
     #     self.sendClient(cSock=cSock, data=data) # 단일 클라이언트에 데이터 송신
 
-    def send(self, cSock : socket.socket, data : bytes):
+    def sendData(self, cSock : socket.socket, data : bytearray):
         if self.connected:
             cSock.sendall(len(data).to_bytes(4, "little"))
             cSock.sendall(data)
@@ -68,55 +67,93 @@ class TCPMultiThreadServer:
         else:
             return False
 
-    # 데이터 수신
-    def receive(self, rSock : socket.socket = None):
+    def send(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray]):
+        self.sendData(cSock, headerBytes)
+        for dataByte in dataBytesList:
+            print(len(dataByte))
+            self.sendData(cSock, dataByte)
+        
+    # 데이터 실제 수신
+    def receiveData(self, rSock : socket.socket = None):
         cAddr = rSock.getpeername() # 데이터를 수신할 클라이언트의 어드레스
         try:
-            # 헤더를 받는다.
             packet = rSock.recv(4)
             if not packet: # 수신한 데이터가 없으면
                 raise # 오류 발생
             dataSize = int.from_bytes(packet, "little")
 
-            headerBytes = bytearray()
-            while len(headerBytes) < dataSize:
-                packetSize = 1024 if len(headerBytes) + 1024 < dataSize else dataSize - len(headerBytes)
+            receiveBytes = bytearray()
+            while len(receiveBytes) < dataSize:
+                packetSize = 1024 if len(receiveBytes) + 1024 < dataSize else dataSize - len(receiveBytes)
                 packet = rSock.recv(packetSize) # 서버로부터 데이터를 수신받는다.
                 if not packet: # 수신한 데이터가 없으면
                     raise # 오류 발생
-                headerBytes.extend(packet)
+                receiveBytes.extend(packet)
             ######
-
-            # 실제 데이터를 받는다.
-            packet : bytes = rSock.recv(4)
-            if not packet: # 수신한 데이터가 없으면
-                raise # 오류 발생
-            dataSize = int.from_bytes(packet, "little")
-
-            dataBytes = bytearray()
-            while len(dataBytes) < dataSize:
-                packetSize = 4096 if len(dataBytes) + 4096 < dataSize else dataSize - len(dataBytes)
-                packet = rSock.recv(packetSize) # 서버로부터 데이터를 수신받는다.
-                if not packet: # 수신한 데이터가 없으면
-                    raise # 오류 발생
-                dataBytes.extend(packet)
-        
-            return (headerBytes, dataBytes)
+            return receiveBytes
         except Exception as e:
             rSock.close() # 클라이언트와 연결된 소켓을 닫고
             self.disconnect(cAddr) # 해당 클라이언트의 정보를 해제한다.
             print(e.with_traceback())
             return None
+
+    def receive(self, rSock : socket.socket = None):
+        headerBytes = self.receiveData(rSock)
+        if headerBytes is None:
+            return (None, None)
+        dataCount = int.from_bytes(headerBytes[0:4], "little")
+        dataBytesList = list()
+        for i in range(dataCount):
+            receiveBytes = self.receiveData(rSock)
+            if receiveBytes is None:
+                return (None, None)
+            dataBytesList.append(receiveBytes)
+        return (headerBytes, dataBytesList)
     
     # 요청 데이터 처리
     # 클라이언트에서 수신받은 요청 데이터의 타입을 구분하여 처리하고
     # 처리된 데이터를 반환하는 함수
-    def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytes : bytearray):
-        dataType = int.from_bytes(headerBytes[0:4], "little")
+    def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray], 
+        mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
+        dataType = int.from_bytes(headerBytes[4:8], "little")
         if dataType == 1:
-            height = int.from_bytes(headerBytes[4:8], "little")
-            width = int.from_bytes(headerBytes[8:12], "little")
-            channels = int.from_bytes(headerBytes[12:16], "little")
-            img = np.ndarray(shape=(height, width, channels), buffer=dataBytes, dtype=np.uint8)
-        return headerBytes, dataBytes
+            height = int.from_bytes(headerBytes[8:12], "little")
+            width = int.from_bytes(headerBytes[12:16], "little")
+            channels = int.from_bytes(headerBytes[16:24], "little")
+            img = np.ndarray(shape=(height, width, channels), buffer=dataBytesList[0], dtype=np.uint8)
+
+            image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            results = face_mesh.process(image)
+
+            # Draw the face mesh annotations on the image.
+            image.flags.writeable = True
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            if results.multi_face_landmarks:
+                face_landmarks = results.multi_face_landmarks[0]
+                
+                mp_drawing.draw_landmarks(
+                    image=image,
+                    landmark_list=face_landmarks,
+                    connections=mp_face_mesh.FACEMESH_TESSELATION,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_drawing_styles
+                    .get_default_face_mesh_tesselation_style())
+                mp_drawing.draw_landmarks(
+                    image=image,
+                    landmark_list=face_landmarks,
+                    connections=mp_face_mesh.FACEMESH_CONTOURS,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_drawing_styles
+                    .get_default_face_mesh_contours_style())
+                mp_drawing.draw_landmarks(
+                    image=image,
+                    landmark_list=face_landmarks,
+                    connections=mp_face_mesh.FACEMESH_IRISES,
+                    landmark_drawing_spec=None,
+                    connection_drawing_spec=mp_drawing_styles
+                    .get_default_face_mesh_iris_connections_style())
+            dataBytesList[0] = image.tobytes()
+            cv2.imshow(str(cSock.getpeername()), image)
+            cv2.waitKey(1)
+        return headerBytes, dataBytesList
 
