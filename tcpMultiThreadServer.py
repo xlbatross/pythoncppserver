@@ -19,7 +19,7 @@ def handler(server : TCPMultiThreadServer, cSock):
         min_tracking_confidence=0.5) as face_mesh:
         while True:
             headerBytes, dataBytesList = server.receive(cSock)
-            if not headerBytes or not dataBytesList:
+            if headerBytes is None and dataBytesList is None:
                 break
             headerBytes, dataBytesList = server.processData(
                 cSock=cSock, headerBytes=headerBytes, dataBytesList=dataBytesList, 
@@ -47,4 +47,4 @@ while True:
     cThread = Thread(target=handler, args=(server, clientSock)) # 연결된 클라이언트에 대한 쓰레드 생성
     cThread.daemon = True # 생성된 쓰레드의 데몬 여부를 True로 한다. (데몬 스레드 = 메인 스레드가 종료되면 즉시 종료되는 스레드)
     cThread.start() # 쓰레드 시작
-    print(server.client)
+    print(server.clients)
