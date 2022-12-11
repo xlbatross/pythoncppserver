@@ -2,13 +2,17 @@ import socket
 import pickle
 import numpy as np
 import cv2
+from dataheader import *
 
 
 class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
         self.clients : dict[tuple, list[socket.socket, str]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
-        self.roomList : dict[tuple, list[tuple]] = {} # 
+
+        self.roomList : dict[tuple, list[tuple]] = {} # 현재 생성된 방의 정보를 담는 변수. 
+        # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트 
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
         self.sock.listen(listener) # 서버 소켓을 연결 요청 대기 상태로 한다.
@@ -88,11 +92,9 @@ class TCPMultiThreadServer:
         newDataBytesList = list()
 
         requestType = int.from_bytes(headerBytes[4:8], "little")
-        if requestType == 1: # reqImage
-            height = int.from_bytes(headerBytes[8:12], "little")
-            width = int.from_bytes(headerBytes[12:16], "little")
-            channels = int.from_bytes(headerBytes[16:24], "little")
-            img = np.ndarray(shape=(height, width, channels), buffer=dataBytesList[0], dtype=np.uint8)
+        if requestType == ResquestType.image: # reqImage
+            header = reqImage(headerBytes)
+            img = np.ndarray(shape=(header.height, header.width, header.channels), buffer=dataBytesList[0], dtype=np.uint8)
 
             image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             results = face_mesh.process(image)
@@ -127,7 +129,7 @@ class TCPMultiThreadServer:
             dataBytesList[0] = image.tobytes()
             cv2.imshow(str(cSock.getpeername()), image)
             cv2.waitKey(1)
-        elif requestType == 2: # reqRoomList
+        elif requestType == ResquestType.roomList: # reqRoomList
             newHeaderBytes.extend(len(self.roomList).to_bytes(4, "little"))
             newHeaderBytes.extend(headerBytes[4:8])
         return newHeaderBytes, newDataBytesList
