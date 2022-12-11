@@ -21,14 +21,14 @@ def handler(server : TCPMultiThreadServer, cSock):
             headerBytes, dataBytesList = server.receive(cSock)
             if headerBytes is None and dataBytesList is None:
                 break
-            headerBytes, dataBytesList = server.processData(
+            response = server.processData(
                 cSock=cSock, headerBytes=headerBytes, dataBytesList=dataBytesList, 
                 mp_face_mesh=mp_face_mesh, 
                 face_mesh=face_mesh,
                 mp_drawing=mp_drawing,
                 mp_drawing_styles = mp_drawing_styles
             )
-            server.send(cSock, headerBytes, dataBytesList)
+            server.send(cSock, response)
         # if type(data) != np.ndarray:
         #     break
         # plot.imshow(data)

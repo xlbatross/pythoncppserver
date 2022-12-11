@@ -1,6 +1,4 @@
 import socket
-import pickle
-import numpy as np
 import cv2
 from dataheader import *
 
@@ -8,9 +6,9 @@ from dataheader import *
 class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
-        self.clients : dict[tuple, list[socket.socket, str]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
+        self.clients : dict[tuple[str, int], list[socket.socket, str]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
 
-        self.roomList : dict[tuple, list[tuple]] = {} # 현재 생성된 방의 정보를 담는 변수. 
+        self.roomList : dict[tuple[str, int], tuple[str, list[tuple[str, int]]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
         # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트 
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
@@ -19,6 +17,8 @@ class TCPMultiThreadServer:
 
     # 접속 종료로 인한 클라이언트 정보 정리
     def disconnect(self, cAddr : tuple):
+        if cAddr in self.roomList:
+            del self.roomList[cAddr]
         if cAddr in self.clients: # 접속을 끊은 클라이언트의 정보가 client 인스턴스 변수에 존재한다면.
             del self.clients[cAddr] # 클라이언트 정보 삭제
         if len(self.clients) == 0: # 만약 서버에 연결된 클라이언트가 없다면
@@ -41,9 +41,9 @@ class TCPMultiThreadServer:
         else:
             return False
 
-    def send(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray]):
-        self.sendData(cSock, headerBytes)
-        for dataByte in dataBytesList:
+    def send(self, cSock : socket.socket, response):
+        self.sendData(cSock, response.headerBytes)
+        for dataByte in response.dataBytesList:
             self.sendData(cSock, dataByte)
         
     # 데이터 실제 수신
@@ -87,16 +87,17 @@ class TCPMultiThreadServer:
     # 처리된 데이터를 반환하는 함수
     def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray], 
         mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
-
-        newHeaderBytes = bytearray()
-        newDataBytesList = list()
-
+        cAddr = cSock.getpeername()
         requestType = int.from_bytes(headerBytes[4:8], "little")
-        if requestType == ResquestType.image: # reqImage
-            header = reqImage(headerBytes)
-            img = np.ndarray(shape=(header.height, header.width, header.channels), buffer=dataBytesList[0], dtype=np.uint8)
+        print(int.from_bytes(headerBytes[0:4], "little"))
+        print(int.from_bytes(headerBytes[4:8], "little"))
+        print(int.from_bytes(headerBytes[8:12], "little"))
+        print(len(dataBytesList))
 
-            image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if requestType == RequestType.image.value: # reqImage
+            reqImage = ReqImage(headerBytes, dataBytesList)
+
+            image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             results = face_mesh.process(image)
 
             # Draw the face mesh annotations on the image.
@@ -126,11 +127,17 @@ class TCPMultiThreadServer:
                     landmark_drawing_spec=None,
                     connection_drawing_spec=mp_drawing_styles
                     .get_default_face_mesh_iris_connections_style())
-            dataBytesList[0] = image.tobytes()
             cv2.imshow(str(cSock.getpeername()), image)
             cv2.waitKey(1)
-        elif requestType == ResquestType.roomList: # reqRoomList
-            newHeaderBytes.extend(len(self.roomList).to_bytes(4, "little"))
-            newHeaderBytes.extend(headerBytes[4:8])
-        return newHeaderBytes, newDataBytesList
-
+            return ResImage(reqImage=reqImage, imageByteData=image.tobytes())
+        elif requestType == RequestType.roomList.value: # reqRoomList
+            print("request Room list")
+            return ResRoomList(self.roomList)
+        elif requestType == RequestType.makeRoom.value: # reqMakeRoom
+            print("request Make room")
+            isMake = False
+            reqMakeRoom = ReqMakeRoom(headerBytes, dataBytesList)
+            if not cAddr in self.roomList:
+                self.roomList[cAddr] = (reqMakeRoom.roomName, [])
+                isMake = True
+            return ResMakeRoom(isMake)
