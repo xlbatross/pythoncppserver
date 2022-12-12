@@ -92,7 +92,6 @@ class TCPMultiThreadServer:
         print(int.from_bytes(headerBytes[0:4], "little"))
         print(int.from_bytes(headerBytes[4:8], "little"))
         print(int.from_bytes(headerBytes[8:12], "little"))
-        print(len(dataBytesList))
 
         if requestType == RequestType.image.value: # reqImage
             reqImage = ReqImage(headerBytes, dataBytesList)
@@ -141,3 +140,10 @@ class TCPMultiThreadServer:
                 self.roomList[cAddr] = (reqMakeRoom.roomName, [])
                 isMake = True
             return ResMakeRoom(isMake)
+        elif requestType == RequestType.enterRoom.value:
+            print("request Enter room")
+            reqEnterRoom = ReqEnterRoom(headerBytes, dataBytesList)
+            print(reqEnterRoom.ip)
+            print(reqEnterRoom.port)
+
+

@@ -13,14 +13,19 @@ class ResponseType(Enum):
     makeRoom = 3
     enterRoom = 4
 
+class DataType(Enum):
+    String = 0
+    IntNumber = 1
+    Image = 2
+
 ####
 class Request:
     def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
         self.headerBytes = headerBytes
         self.dataBytesList = dataBytesList
-        self.dataCount = int.from_bytes(headerBytes[0:4], "little")
+        self.receiveCount = int.from_bytes(headerBytes[0:4], "little")
         self.type = int.from_bytes(headerBytes[4:8], "little")
-        self.attrSize = int.from_bytes(headerBytes[8:12], "little")
+        self.dataSize = int.from_bytes(headerBytes[8:12], "little")
 
 class ReqImage(Request):
     def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
@@ -34,6 +39,12 @@ class ReqMakeRoom(Request):
     def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
         super().__init__(headerBytes=headerBytes, dataBytesList=dataBytesList)
         self.roomName = dataBytesList[0].decode()
+
+class ReqEnterRoom(Request):
+    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=headerBytes, dataBytesList=dataBytesList)
+        self.ip = dataBytesList[0].decode()
+        self.port = int.from_bytes(dataBytesList[1], "little")
 ####
 class Response:
     def __init__(self):
@@ -50,34 +61,28 @@ class ResRoomList(Response):
     def __init__(self, roomList : dict[tuple[str, int], tuple[str, list[tuple[str, int]]]]):
         # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트
         super().__init__()
-        self.headerBytes.extend(len(roomList).to_bytes(4, "little")) # datacount
+        self.headerBytes.extend((len(roomList) * 4).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.roomList.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(4).to_bytes(4, "little")) # attrSize / 방장 IP 길이, 방장 포트 번호 길이, 방 이름 길이, 방안의 사람 수 길이
+        self.headerBytes.extend(int(4).to_bytes(4, "little")) # dataSize / 방장 IP 길이, 방장 포트 번호 길이, 방 이름 길이, 방안의 사람 수 길이
         for key in roomList:
-            dataBytes = bytearray()
-
             # 방장 IP
-            ipBytes = key[0].encode()
-            self.headerBytes.extend(len(ipBytes).to_bytes(4, "little"))
-            dataBytes.extend(ipBytes)
+            self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
+            self.dataBytesList.append(key[0].encode())
             # 방장 포트 번호
-            self.headerBytes.extend(int(4).to_bytes(4, "little"))
-            dataBytes.extend(key[1].to_bytes(4, "little"))
+            self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
+            self.dataBytesList.append(key[1].to_bytes(4, "little"))
             # 방 이름
-            roomNameBytes = roomList[key][0].encode()
-            self.headerBytes.extend(len(roomNameBytes).to_bytes(4, "little"))
-            dataBytes.extend(roomNameBytes)
+            self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
+            self.dataBytesList.append(roomList[key][0].encode())
             # 방 안 사람 수
-            self.headerBytes.extend(int(4).to_bytes(4, "little"))
-            dataBytes.extend(len(roomList[key][1]).to_bytes(4, "little"))
-
-            self.dataBytesList.append(dataBytes)
+            self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
+            self.dataBytesList.append(len(roomList[key][1]).to_bytes(4, "little"))
 
 class ResMakeRoom(Response):
     def __init__(self, isMake : bool):
         super().__init__()
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # datacount
+        self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.makeRoom.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # attrSize
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # data length  
+        self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
+        self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
         self.dataBytesList.append(isMake.to_bytes(1, "little"))
