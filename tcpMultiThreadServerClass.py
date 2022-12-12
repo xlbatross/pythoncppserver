@@ -6,10 +6,10 @@ from dataheader import *
 class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
-        self.clients : dict[tuple[str, int], list[socket.socket, str]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
+        self.clients : dict[tuple[str, int], list[socket.socket, str, tuple]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
 
         self.roomList : dict[tuple[str, int], tuple[str, list[tuple[str, int]]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
-        # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트 
+        # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
@@ -20,6 +20,9 @@ class TCPMultiThreadServer:
         if cAddr in self.roomList:
             del self.roomList[cAddr]
         if cAddr in self.clients: # 접속을 끊은 클라이언트의 정보가 client 인스턴스 변수에 존재한다면.
+            if not self.clients[cAddr][2] is None:
+                hostAddress = self.clients[cAddr][2]
+                self.roomList[hostAddress][1].remove(cAddr)
             del self.clients[cAddr] # 클라이언트 정보 삭제
         if len(self.clients) == 0: # 만약 서버에 연결된 클라이언트가 없다면
             self.connected = False # 서버와 연결된 클라이언트가 없는 상태임을 저장한다.
@@ -29,11 +32,13 @@ class TCPMultiThreadServer:
     def accept(self):
         cSock, cAddr = self.sock.accept() # 클라이언트와 연결이 된다면 클라이언트와 연결된 소켓과 클라이언트의 어드레스(IP와 포트번호)를 반환한다.
         self.connected = True # 서버가 클라이언트와 연결된 상태임을 저장한다.
-        self.clients[cAddr] = [cSock, ""] # client 인스턴스 변수에 클라이언트의 어드레스를 키값으로 하여 소켓과 해당 클라이언트에 로그인한 아이디를 저장한다.
+        self.clients[cAddr] = [cSock, "", None] 
+        # client 인스턴스 변수에 클라이언트의 어드레스를 키값으로 하여 소켓과 해당 클라이언트에 로그인한 아이디를 저장한다.
         # 지금은 서버로 접속만 했기 때문에 아이디 부분은 빈 부분이다.
+        # 아이디 부분 옆은 접속한 방의 방장의 어드레스이다. 지금은 아직 방에 들어가지 않았으니 None이다.
         return cSock, cAddr # 클라이언트와 연결된 소켓과 클리이언트의 어드레스 반환
 
-    def sendData(self, cSock : socket.socket, data : bytearray):
+    def sendByteData(self, cSock : socket.socket, data : bytearray):
         if self.connected:
             cSock.sendall(len(data).to_bytes(4, "little"))
             cSock.sendall(data)
@@ -41,10 +46,29 @@ class TCPMultiThreadServer:
         else:
             return False
 
-    def send(self, cSock : socket.socket, response):
-        self.sendData(cSock, response.headerBytes)
+    def sendData(self, cSock : socket.socket, response : Response):
+        self.sendByteData(cSock, response.headerBytes)
         for dataByte in response.dataBytesList:
-            self.sendData(cSock, dataByte)
+            self.sendByteData(cSock, dataByte)
+    
+    def send(self, cSock : socket.socket, response : Response):
+        cAddr = cSock.getpeername() # 데이터를 수신할 클라이언트의 어드레스
+        if type(response) in [ResRoomList, ResMakeRoom]:
+            self.sendData(cSock, response)
+        elif type(response) == ResEnterRoom:
+            self.sendData(cSock, response)
+            if response.isEnter:
+                hostAddress = self.clients[cAddr][2]
+                resJoinRoomStudent = ResJoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessor=False)
+                for rAddr in self.roomList[hostAddress][1]:
+                    self.sendData(self.clients[rAddr][0], resJoinRoomStudent)
+                self.sendData(self.clients[hostAddress][0], ResJoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessor=True))
+        elif type(response) == ResImage:
+            if response.number == 0:
+                for rAddr in self.roomList[cAddr][1]:
+                    self.sendData(self.clients[rAddr][0], response)
+            elif response.number > 0:
+                self.sendData(self.clients[cAddr][2], response)
         
     # 데이터 실제 수신
     def receiveData(self, rSock : socket.socket = None):
@@ -73,9 +97,9 @@ class TCPMultiThreadServer:
         headerBytes = self.receiveData(rSock)
         if headerBytes is None:
             return (None, None)
-        dataCount = int.from_bytes(headerBytes[0:4], "little")
+        receiveCount = int.from_bytes(headerBytes[0:4], "little")
         dataBytesList = list()
-        for i in range(dataCount):
+        for i in range(receiveCount):
             receiveBytes = self.receiveData(rSock)
             if receiveBytes is None:
                 return (None, None)
@@ -95,47 +119,53 @@ class TCPMultiThreadServer:
 
         if requestType == RequestType.image.value: # reqImage
             reqImage = ReqImage(headerBytes, dataBytesList)
-
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
-            results = face_mesh.process(image)
+            number = -1
+            if cAddr in self.roomList:
+                number = 0 
+            elif not self.clients[cAddr][2] is None:
+                hostAddress = self.clients[cAddr][2]
+                number = self.roomList[hostAddress][1].index(cAddr) + 1
 
-            # Draw the face mesh annotations on the image.
-            image.flags.writeable = True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            if results.multi_face_landmarks:
-                face_landmarks = results.multi_face_landmarks[0]
-                
-                mp_drawing.draw_landmarks(
-                    image=image,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_TESSELATION,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp_drawing_styles
-                    .get_default_face_mesh_tesselation_style())
-                mp_drawing.draw_landmarks(
-                    image=image,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_CONTOURS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp_drawing_styles
-                    .get_default_face_mesh_contours_style())
-                mp_drawing.draw_landmarks(
-                    image=image,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_IRISES,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=mp_drawing_styles
-                    .get_default_face_mesh_iris_connections_style())
-            cv2.imshow(str(cSock.getpeername()), image)
-            cv2.waitKey(1)
-            return ResImage(reqImage=reqImage, imageByteData=image.tobytes())
+                results = face_mesh.process(image)
+
+                # Draw the face mesh annotations on the image.
+                image.flags.writeable = True
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                if results.multi_face_landmarks:
+                    face_landmarks = results.multi_face_landmarks[0]
+                    
+                    mp_drawing.draw_landmarks(
+                        image=image,
+                        landmark_list=face_landmarks,
+                        connections=mp_face_mesh.FACEMESH_TESSELATION,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp_drawing_styles
+                        .get_default_face_mesh_tesselation_style())
+                    mp_drawing.draw_landmarks(
+                        image=image,
+                        landmark_list=face_landmarks,
+                        connections=mp_face_mesh.FACEMESH_CONTOURS,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp_drawing_styles
+                        .get_default_face_mesh_contours_style())
+                    mp_drawing.draw_landmarks(
+                        image=image,
+                        landmark_list=face_landmarks,
+                        connections=mp_face_mesh.FACEMESH_IRISES,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp_drawing_styles
+                        .get_default_face_mesh_iris_connections_style())
+                # cv2.imshow(str(cSock.getpeername()), image)
+                # cv2.waitKey(1)
+            return ResImage(image, number)
         elif requestType == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList(self.roomList)
         elif requestType == RequestType.makeRoom.value: # reqMakeRoom
             print("request Make room")
-            isMake = False
             reqMakeRoom = ReqMakeRoom(headerBytes, dataBytesList)
+            isMake = False
             if not cAddr in self.roomList:
                 self.roomList[cAddr] = (reqMakeRoom.roomName, [])
                 isMake = True
@@ -143,7 +173,12 @@ class TCPMultiThreadServer:
         elif requestType == RequestType.enterRoom.value:
             print("request Enter room")
             reqEnterRoom = ReqEnterRoom(headerBytes, dataBytesList)
-            print(reqEnterRoom.ip)
-            print(reqEnterRoom.port)
-
-
+            hostAddress = (reqEnterRoom.ip, reqEnterRoom.port)
+            isEnter = False
+            if cAddr != hostAddress and self.clients[cAddr][2] is None and len(self.roomList[hostAddress][1]) < 4:
+                self.clients[cAddr][2] = hostAddress
+                self.roomList[hostAddress][1].append(cAddr)
+                isEnter = True
+                print(self.roomList)
+            return ResEnterRoom(isEnter)
+        
