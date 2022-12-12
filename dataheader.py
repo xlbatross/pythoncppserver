@@ -6,6 +6,7 @@ class RequestType(Enum):
     roomList = 2
     makeRoom = 3
     enterRoom = 4
+    leaveRoom = 5
 
 class ResponseType(Enum):
     image = 1
@@ -13,6 +14,7 @@ class ResponseType(Enum):
     makeRoom = 3
     enterRoom = 4
     joinRoom = 5
+    disjoinRoom = 6
 
 class DataType(Enum):
     String = 0
@@ -42,6 +44,10 @@ class ReqEnterRoom(Request):
         super().__init__(headerBytes=headerBytes)
         self.ip = dataBytesList[0].decode()
         self.port = int.from_bytes(dataBytesList[1], "little")
+
+class ReqLeaveRoom(Request):
+    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=headerBytes)
 ####
 class Response:
     def __init__(self):
@@ -92,6 +98,7 @@ class ResMakeRoom(Response):
 class ResEnterRoom(Response):
     def __init__(self, isEnter : bool):
         super().__init__()
+        self.isEnter = isEnter
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.enterRoom.value.to_bytes(4, "little")) # response type
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
@@ -99,12 +106,23 @@ class ResEnterRoom(Response):
         self.dataBytesList.append(isEnter.to_bytes(4, "little"))
 
 class ResJoinRoom(Response):
-    def __init__(self, name : str, isProfessor : bool):
+    def __init__(self, name : str):
         super().__init__()
-        self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.joinRoom.value.to_bytes(4, "little")) # response type
+        self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
+        self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
+        self.dataBytesList.append(name.encode())
+
+class ResDisjoinRoom(Response):
+    def __init__(self, name : str, isProfessorOut : bool):
+        super().__init__()
+        self.isProfessorOut = isProfessorOut
+        self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(ResponseType.disjoinRoom.value.to_bytes(4, "little")) # response type
         self.headerBytes.extend(int(2).to_bytes(4, "little")) # dataSize
         self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
         self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
         self.dataBytesList.append(name.encode())
-        self.dataBytesList.append(isProfessor.to_bytes(4, "little"))
+        self.dataBytesList.append(isProfessorOut.to_bytes(4, "little"))
+        

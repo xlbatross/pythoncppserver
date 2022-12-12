@@ -18,11 +18,10 @@ class TCPMultiThreadServer:
     # 접속 종료로 인한 클라이언트 정보 정리
     def disconnect(self, cAddr : tuple):
         if cAddr in self.roomList:
-            del self.roomList[cAddr]
+            self.send(self.clients[cAddr][0], ResDisjoinRoom("", isProfessorOut=True))
         if cAddr in self.clients: # 접속을 끊은 클라이언트의 정보가 client 인스턴스 변수에 존재한다면.
             if not self.clients[cAddr][2] is None:
-                hostAddress = self.clients[cAddr][2]
-                self.roomList[hostAddress][1].remove(cAddr)
+                self.send(self.clients[cAddr][0], ResDisjoinRoom(cAddr, isProfessorOut=False))
             del self.clients[cAddr] # 클라이언트 정보 삭제
         if len(self.clients) == 0: # 만약 서버에 연결된 클라이언트가 없다면
             self.connected = False # 서버와 연결된 클라이언트가 없는 상태임을 저장한다.
@@ -59,16 +58,31 @@ class TCPMultiThreadServer:
             self.sendData(cSock, response)
             if response.isEnter:
                 hostAddress = self.clients[cAddr][2]
-                resJoinRoomStudent = ResJoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessor=False)
+                resJoinRoom = ResJoinRoom(cAddr[0] + " " + str(cAddr[1]))
                 for rAddr in self.roomList[hostAddress][1]:
-                    self.sendData(self.clients[rAddr][0], resJoinRoomStudent)
-                self.sendData(self.clients[hostAddress][0], ResJoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessor=True))
+                    self.sendData(self.clients[rAddr][0], resJoinRoom)
+                self.sendData(self.clients[hostAddress][0], resJoinRoom)
         elif type(response) == ResImage:
             if response.number == 0:
                 for rAddr in self.roomList[cAddr][1]:
                     self.sendData(self.clients[rAddr][0], response)
             elif response.number > 0:
                 self.sendData(self.clients[cAddr][2], response)
+        elif type(response) == ResDisjoinRoom:
+            if response.isProfessorOut:
+                for rAddr in self.roomList[cAddr][1]:
+                    self.clients[rAddr][2] = None
+                    self.sendData(self.clients[rAddr], response)
+                del self.roomList[cAddr]
+            else:
+                hostAddress = self.clients[cAddr][2]
+                self.clients[cAddr][2] = None
+                self.roomList[hostAddress][1].remove(cAddr)
+                for rAddr in self.roomList[hostAddress][1]:
+                    self.sendData(self.clients[rAddr][1], response)
+                self.sendData(self.clients[hostAddress][1], response)
+                
+                
         
     # 데이터 실제 수신
     def receiveData(self, rSock : socket.socket = None):
@@ -181,4 +195,9 @@ class TCPMultiThreadServer:
                 isEnter = True
                 print(self.roomList)
             return ResEnterRoom(isEnter)
+        elif requestType == RequestType.leaveRoom.value:
+            resDisjoinRoom = ResDisjoinRoom(cAddr, isProfessorOut=False)
+            if cAddr in self.roomList:
+                resDisjoinRoom.isProfessorOut = True
+            return resDisjoinRoom
         
