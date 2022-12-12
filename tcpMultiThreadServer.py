@@ -4,10 +4,11 @@ import cv2
 import numpy as np
 import time
 import mediapipe as mp
+import socket
 
 # 생성된 쓰레드에서 반복적으로 처리할 함수
 # 클라이언트에서 데이터가 수신되면 서버는 요청을 처리하고 처리 결과 데이터에 따라 특정 클라이언트에 데이터를 송신한다 .
-def handler(server : TCPMultiThreadServer, cSock):
+def handler(server : TCPMultiThreadServer, cSock : socket.socket):
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
     mp_face_mesh = mp.solutions.face_mesh
@@ -28,7 +29,7 @@ def handler(server : TCPMultiThreadServer, cSock):
                 mp_drawing=mp_drawing,
                 mp_drawing_styles = mp_drawing_styles
             )
-            server.send(cSock, response)
+            server.send(cSock.getpeername(), response)
         # if type(data) != np.ndarray:
         #     break
         # plot.imshow(data)
