@@ -1,10 +1,12 @@
 import socket
 import cv2
 from dataheader import *
+from db import DB
 
 
 class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
+        self.db = DB()
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
         self.clients : dict[tuple[str, int], list[socket.socket, str, tuple]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
 
@@ -52,7 +54,7 @@ class TCPMultiThreadServer:
     
     def send(self, cAddr : tuple, response : Response):
         cSock = self.clients[cAddr][0]
-        if type(response) in [ResRoomList, ResMakeRoom]:
+        if type(response) in [ResRoomList, ResMakeRoom, ResLogin]:
             self.sendData(cSock, response)
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
@@ -210,4 +212,8 @@ class TCPMultiThreadServer:
             print("request leave room")
             isProfessorOut = (True if cAddr in self.roomList else False)
             return  ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=isProfessorOut)
-        
+        elif request.type == RequestType.login.value:
+            print("request Login")
+            reqLogin = ReqLogin(request, dataBytesList)
+            isSuccessed, ment = self.db.login(reqLogin.num,reqLogin.pw)
+            return ResLogin(isSuccessed=isSuccessed, ment=ment)

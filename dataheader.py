@@ -7,6 +7,8 @@ class RequestType(Enum):
     makeRoom = 3
     enterRoom = 4
     leaveRoom = 5
+    login = 6
+    signUp = 7
 
 class ResponseType(Enum):
     image = 1
@@ -15,6 +17,8 @@ class ResponseType(Enum):
     enterRoom = 4
     joinRoom = 5
     disjoinRoom = 6
+    login = 7
+    signUp = 8
 
 ####
 class Request:
@@ -40,9 +44,19 @@ class ReqEnterRoom(Request):
         self.ip = dataBytesList[0].decode()
         self.port = int.from_bytes(dataBytesList[1], "little")
 
-class ReqLeaveRoom(Request):
+class ReqLogin(Request):
     def __init__(self, request : Request, dataBytesList : list[bytearray]):
         super().__init__(headerBytes=request.headerBytes)
+        self.num = dataBytesList[0].decode()
+        self.pw = dataBytesList[1].decode()
+
+class ReqSignUp(Request):
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
+        self.name = dataBytesList[0].decode()
+        self.num = dataBytesList[1].decode()
+        self.pw = dataBytesList[2].decode()
+        self.cate = dataBytesList[3].decode()
 ####
 class Response:
     def __init__(self):
@@ -120,3 +134,22 @@ class ResDisjoinRoom(Response):
         self.dataBytesList.append(name.encode())
         self.dataBytesList.append(isProfessorOut.to_bytes(4, "little"))
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
+
+class ResLogin(Response):
+    def __init__(self, isSuccessed : bool, ment : str):
+        super().__init__()
+        self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(ResponseType.login.value.to_bytes(4, "little")) # response type
+        self.dataBytesList.append(isSuccessed.to_bytes(4, "little"))
+        self.dataBytesList.append(ment.encode())
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
+
+class ResSignUp(Response):
+    def __init__(self, isSuccessed : bool, ment : str):
+        super().__init__()
+        self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(ResponseType.signUp.value.to_bytes(4, "little")) # response type
+        self.dataBytesList.append(isSuccessed.to_bytes(4, "little"))
+        self.dataBytesList.append(ment.encode())
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
+
