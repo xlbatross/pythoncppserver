@@ -1,5 +1,6 @@
 from enum import Enum
 import numpy as np
+import socket
 
 class RequestType(Enum):
     image = 1
@@ -93,6 +94,26 @@ class ResRoomList(Response):
             self.dataBytesList.append(key[0].encode())
             # 방장 포트 번호
             self.dataBytesList.append(key[1].to_bytes(4, "little"))
+            # 방 이름
+            self.dataBytesList.append(roomList[key][0].encode())
+            # 방 안 사람 수
+            self.dataBytesList.append(len(roomList[key][1]).to_bytes(4, "little"))
+
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
+
+class ResRoomList2(Response):
+    def __init__(self, roomList : dict[socket.socket, tuple[str, list[socket.socket]]]):
+        # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트
+        super().__init__()
+        print(roomList)
+        self.headerBytes.extend((len(roomList) * 4).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(ResponseType.roomList.value.to_bytes(4, "little")) # response type
+
+        for key in roomList:
+            # 방장 IP
+            self.dataBytesList.append(key.getpeername()[0].encode())
+            # 방장 포트 번호
+            self.dataBytesList.append(key.getpeername()[1].to_bytes(4, "little"))
             # 방 이름
             self.dataBytesList.append(roomList[key][0].encode())
             # 방 안 사람 수

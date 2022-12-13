@@ -28,6 +28,7 @@ class TCPMultiThreadServer:
         if len(self.clients) == 0: # 만약 서버에 연결된 클라이언트가 없다면
             self.connected = False # 서버와 연결된 클라이언트가 없는 상태임을 저장한다.
         print(self.clients)
+        print(self.roomList)
     
     # 클라이언트 연결
     def accept(self):
@@ -105,7 +106,7 @@ class TCPMultiThreadServer:
         except Exception as e:
             rSock.close() # 클라이언트와 연결된 소켓을 닫고
             self.disconnect(cAddr) # 해당 클라이언트의 정보를 해제한다.
-            print(e.with_traceback())
+            # print(e.with_traceback())
             return None
 
     def receive(self, rSock : socket.socket = None):
@@ -151,7 +152,7 @@ class TCPMultiThreadServer:
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
             if cAddr in self.roomList:
-                number = 0 
+                return ResImage(image, 0)
             elif not self.clients[cAddr][2] is None:
                 hostAddress = self.clients[cAddr][2]
                 number = self.roomList[hostAddress][1].index(cAddr) + 1
@@ -186,7 +187,7 @@ class TCPMultiThreadServer:
                         .get_default_face_mesh_iris_connections_style())
                 # cv2.imshow(str(cSock.getpeername()), image)
                 # cv2.waitKey(1)
-            return ResImage(image, number)
+                return ResImage(image, number)
         elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList(self.roomList)
