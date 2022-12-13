@@ -67,7 +67,8 @@ class TCPMultiThreadServer:
                 for rAddr in self.roomList[cAddr][1]:
                     self.sendData(self.clients[rAddr][0], response)
             elif response.number > 0:
-                self.sendData(self.clients[cAddr][2], response)
+                hostAddress = self.clients[cAddr][2]
+                self.sendData(self.clients[hostAddress][0], response)
         elif type(response) == ResDisjoinRoom:
             if response.isProfessorOut:
                 for rAddr in self.roomList[cAddr][1]:
@@ -123,14 +124,28 @@ class TCPMultiThreadServer:
     # 처리된 데이터를 반환하는 함수
     def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray], 
         mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
+        
         cAddr = cSock.getpeername()
-        requestType = int.from_bytes(headerBytes[4:8], "little")
-        print(int.from_bytes(headerBytes[0:4], "little"))
-        print(int.from_bytes(headerBytes[4:8], "little"))
-        print(int.from_bytes(headerBytes[8:12], "little"))
+        request = Request(headerBytes=headerBytes)
 
-        if requestType == RequestType.image.value: # reqImage
-            reqImage = ReqImage(headerBytes, dataBytesList)
+        print()
+        print(cAddr)
+        print(request.receiveCount)
+        print(request.type)
+        print(request.totalDataSize)
+
+        receiveTotalSize = 0
+        for dataBytes in dataBytesList:
+            receiveTotalSize += len(dataBytes)
+
+        print(receiveTotalSize)
+
+        if request.totalDataSize != receiveTotalSize:
+            return None
+
+        if request.type == RequestType.image.value: # reqImage
+            print("request Image")
+            reqImage = ReqImage(request, dataBytesList)
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
             if cAddr in self.roomList:
@@ -143,7 +158,6 @@ class TCPMultiThreadServer:
 
                 # Draw the face mesh annotations on the image.
                 image.flags.writeable = True
-                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 if results.multi_face_landmarks:
                     face_landmarks = results.multi_face_landmarks[0]
                     
@@ -171,33 +185,29 @@ class TCPMultiThreadServer:
                 # cv2.imshow(str(cSock.getpeername()), image)
                 # cv2.waitKey(1)
             return ResImage(image, number)
-        elif requestType == RequestType.roomList.value: # reqRoomList
+        elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList(self.roomList)
-        elif requestType == RequestType.makeRoom.value: # reqMakeRoom
+        elif request.type == RequestType.makeRoom.value: # reqMakeRoom
             print("request Make room")
-            reqMakeRoom = ReqMakeRoom(headerBytes, dataBytesList)
+            reqMakeRoom = ReqMakeRoom(request, dataBytesList)
             isMake = False
             if not cAddr in self.roomList:
                 self.roomList[cAddr] = (reqMakeRoom.roomName, [])
                 isMake = True
             return ResMakeRoom(isMake)
-        elif requestType == RequestType.enterRoom.value:
+        elif request.type == RequestType.enterRoom.value:
             print("request Enter room")
-            reqEnterRoom = ReqEnterRoom(headerBytes, dataBytesList)
+            reqEnterRoom = ReqEnterRoom(request, dataBytesList)
             hostAddress = (reqEnterRoom.ip, reqEnterRoom.port)
             isEnter = False
             if cAddr != hostAddress and self.clients[cAddr][2] is None and len(self.roomList[hostAddress][1]) < 4:
                 self.clients[cAddr][2] = hostAddress
                 self.roomList[hostAddress][1].append(cAddr)
                 isEnter = True
-                print(self.roomList)
             return ResEnterRoom(isEnter)
-        elif requestType == RequestType.leaveRoom.value:
-            resDisjoinRoom = None
-            if cAddr in self.roomList:
-                resDisjoinRoom = ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=True)
-            else:
-                resDisjoinRoom = ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=False)
-            return resDisjoinRoom
+        elif request.type == RequestType.leaveRoom.value:
+            print("request leave room")
+            isProfessorOut = (True if cAddr in self.roomList else False)
+            return  ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=isProfessorOut)
         

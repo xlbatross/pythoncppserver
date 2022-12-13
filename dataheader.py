@@ -16,54 +16,56 @@ class ResponseType(Enum):
     joinRoom = 5
     disjoinRoom = 6
 
-class DataType(Enum):
-    String = 0
-    IntNumber = 1
-    OpenCVImage = 2
-
 ####
 class Request:
     def __init__(self, headerBytes : bytearray):
         self.headerBytes = headerBytes
         self.receiveCount = int.from_bytes(headerBytes[0:4], "little")
         self.type = int.from_bytes(headerBytes[4:8], "little")
-        self.dataSize = int.from_bytes(headerBytes[8:12], "little")
+        self.totalDataSize = int.from_bytes(headerBytes[8:12], "little")
 
 class ReqImage(Request):
-    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
-        super().__init__(headerBytes=headerBytes)
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
         self.img = np.ndarray(shape=(240, 320, 3), buffer=dataBytesList[0], dtype=np.uint8)
 
 class ReqMakeRoom(Request):
-    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
-        super().__init__(headerBytes=headerBytes)
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
         self.roomName = dataBytesList[0].decode()
 
 class ReqEnterRoom(Request):
-    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
-        super().__init__(headerBytes=headerBytes)
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
         self.ip = dataBytesList[0].decode()
         self.port = int.from_bytes(dataBytesList[1], "little")
 
 class ReqLeaveRoom(Request):
-    def __init__(self, headerBytes : bytearray, dataBytesList : list[bytearray]):
-        super().__init__(headerBytes=headerBytes)
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
 ####
 class Response:
     def __init__(self):
         self.headerBytes : bytearray = bytearray()
         self.dataBytesList : list[bytearray] = list()
+    
+    def totalDataSize(self):
+        totalDataSize = 0
+        for dataBytes in self.dataBytesList:
+            totalDataSize += len(dataBytes)
+        return totalDataSize
 
 class ResImage(Response):
     def __init__(self, img : np.ndarray, number : int):
         super().__init__()
+        self.number = number
         self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.image.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(2).to_bytes(4, "little")) # dataSize
-        self.headerBytes.extend(DataType.OpenCVImage.value.to_bytes(4, "little"))
-        self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
+        
         self.dataBytesList.append(img.tobytes())
         self.dataBytesList.append(number.to_bytes(4, "little"))
+
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResRoomList(Response):
     def __init__(self, roomList : dict[tuple[str, int], tuple[str, list[tuple[str, int]]]]):
@@ -71,29 +73,26 @@ class ResRoomList(Response):
         super().__init__()
         self.headerBytes.extend((len(roomList) * 4).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.roomList.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(4).to_bytes(4, "little")) # dataSize / 방장 IP 길이, 방장 포트 번호 길이, 방 이름 길이, 방안의 사람 수 길이
+
         for key in roomList:
             # 방장 IP
-            self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
             self.dataBytesList.append(key[0].encode())
             # 방장 포트 번호
-            self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
             self.dataBytesList.append(key[1].to_bytes(4, "little"))
             # 방 이름
-            self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
             self.dataBytesList.append(roomList[key][0].encode())
             # 방 안 사람 수
-            self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
             self.dataBytesList.append(len(roomList[key][1]).to_bytes(4, "little"))
+
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResMakeRoom(Response):
     def __init__(self, isMake : bool):
         super().__init__()
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.makeRoom.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
-        self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
         self.dataBytesList.append(isMake.to_bytes(4, "little"))
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResEnterRoom(Response):
     def __init__(self, isEnter : bool):
@@ -101,18 +100,16 @@ class ResEnterRoom(Response):
         self.isEnter = isEnter
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.enterRoom.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
-        self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
         self.dataBytesList.append(isEnter.to_bytes(4, "little"))
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResJoinRoom(Response):
     def __init__(self, name : str):
         super().__init__()
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.joinRoom.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(1).to_bytes(4, "little")) # dataSize
-        self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
         self.dataBytesList.append(name.encode())
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResDisjoinRoom(Response):
     def __init__(self, name : str, isProfessorOut : bool):
@@ -120,9 +117,6 @@ class ResDisjoinRoom(Response):
         self.isProfessorOut = isProfessorOut
         self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.disjoinRoom.value.to_bytes(4, "little")) # response type
-        self.headerBytes.extend(int(2).to_bytes(4, "little")) # dataSize
-        self.headerBytes.extend(DataType.String.value.to_bytes(4, "little"))
-        self.headerBytes.extend(DataType.IntNumber.value.to_bytes(4, "little"))
         self.dataBytesList.append(name.encode())
         self.dataBytesList.append(isProfessorOut.to_bytes(4, "little"))
-        
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize

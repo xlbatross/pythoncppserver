@@ -29,14 +29,8 @@ def handler(server : TCPMultiThreadServer, cSock : socket.socket):
                 mp_drawing=mp_drawing,
                 mp_drawing_styles = mp_drawing_styles
             )
-            server.send(cSock.getpeername(), response)
-        # if type(data) != np.ndarray:
-        #     break
-        # plot.imshow(data)
-        # plot.show()
-        # cv2.waitKey(1)
-        # processData = server.processData(cSock=cSock, data=data)
-        # server.send(cSock=cSock, data=processData)
+            if not response is None:
+                server.send(cSock.getpeername(), response)
 
 server = TCPMultiThreadServer(port = 2500, listener = 100) # TCPMultiThreadServer 서버 객체 생성
 
