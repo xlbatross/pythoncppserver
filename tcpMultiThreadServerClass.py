@@ -41,12 +41,8 @@ class TCPMultiThreadServer:
         return cSock, cAddr # 클라이언트와 연결된 소켓과 클리이언트의 어드레스 반환
 
     def sendByteData(self, cSock : socket.socket, data : bytearray):
-        if self.connected:
-            cSock.sendall(len(data).to_bytes(4, "little"))
-            cSock.sendall(data)
-            return True
-        else:
-            return False
+        cSock.sendall(len(data).to_bytes(4, "little"))
+        cSock.sendall(data)
 
     def sendData(self, cSock : socket.socket, response : Response):
         self.sendByteData(cSock, response.headerBytes)
@@ -55,7 +51,7 @@ class TCPMultiThreadServer:
     
     def send(self, cAddr : tuple, response : Response):
         cSock = self.clients[cAddr][0]
-        if type(response) in [ResRoomList, ResMakeRoom, ResLogin]:
+        if type(response) in [ResRoomList, ResMakeRoom, ResLogin, ResSignUp]:
             self.sendData(cSock, response)
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
@@ -65,7 +61,7 @@ class TCPMultiThreadServer:
                 for rAddr in self.roomList[hostAddress][1]:
                     self.sendData(self.clients[rAddr][0], resJoinRoom)
                 self.sendData(self.clients[hostAddress][0], resJoinRoom)
-        elif type(response) == ResImage:
+        elif ResImage in type(response).mro():
             if response.number == 0:
                 for rAddr in self.roomList[cAddr][1]:
                     self.sendData(self.clients[rAddr][0], response)
@@ -152,18 +148,16 @@ class TCPMultiThreadServer:
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
             if cAddr in self.roomList:
-                return ResImage(image, 0)
+                return ResProImage(image, 0)
             elif not self.clients[cAddr][2] is None:
                 hostAddress = self.clients[cAddr][2]
                 number = self.roomList[hostAddress][1].index(cAddr) + 1
 
                 results = face_mesh.process(image)
 
-                # Draw the face mesh annotations on the image.
                 image.flags.writeable = True
                 if results.multi_face_landmarks:
                     face_landmarks = results.multi_face_landmarks[0]
-                    
                     mp_drawing.draw_landmarks(
                         image=image,
                         landmark_list=face_landmarks,
@@ -187,7 +181,14 @@ class TCPMultiThreadServer:
                         .get_default_face_mesh_iris_connections_style())
                 # cv2.imshow(str(cSock.getpeername()), image)
                 # cv2.waitKey(1)
-                return ResImage(image, number)
+                if number == 1:
+                    return ResFirstImage(image, number)
+                elif number == 2:
+                    return ResSecondImage(image, number)
+                elif number == 3:
+                    return ResThirdImage(image, number)
+                elif number == 4:
+                    return ResForthImage(image, number)
         elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList(self.roomList)
@@ -218,3 +219,8 @@ class TCPMultiThreadServer:
             reqLogin = ReqLogin(request, dataBytesList)
             isSuccessed, ment = self.db.login(reqLogin.num,reqLogin.pw)
             return ResLogin(isSuccessed=isSuccessed, ment=ment)
+        elif request.type == RequestType.signUp.value:
+            print("request SignUp")
+            reqSignUp = ReqSignUp(request, dataBytesList)
+            isSuccessed, ment = self.db.signUp(reqSignUp.name, reqSignUp.num, reqSignUp.pw, reqSignUp.cate)
+            return ResSignUp(isSuccessed=isSuccessed, ment=ment)

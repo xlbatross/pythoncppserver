@@ -46,6 +46,7 @@ class DB:
         cursor.execute(sql)
         conn.commit()
         conn.close()
+        return True, "회원가입 성공!"
 
     def search(self, num):
         conn = self.connect()

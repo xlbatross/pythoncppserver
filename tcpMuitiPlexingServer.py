@@ -137,7 +137,7 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
         image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
         number = -1
         if conn in roomList:
-            return ResImage(image, 0)
+            return ResProImage(image, 0)
         elif not clients[conn][1] is None:
             proSock = clients[conn][1]
             number = roomList[proSock][1].index(conn) + 1
@@ -172,7 +172,14 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
                     .get_default_face_mesh_iris_connections_style())
             # cv2.imshow(str(cSock.getpeername()), image)
             # cv2.waitKey(1)
-            return ResImage(image, number)
+            if number == 1:
+                return ResFirstImage(image, number)
+            elif number == 2:
+                return ResSecondImage(image, number)
+            elif number == 3:
+                return ResThirdImage(image, number)
+            elif number == 4:
+                return ResForthImage(image, number)
     elif request.type == RequestType.roomList.value: # reqRoomList
         print("request Room list")
         return ResRoomList2(roomList)
@@ -205,6 +212,11 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
         reqLogin = ReqLogin(request, dataBytesList)
         isSuccessed, ment = db.login(reqLogin.num,reqLogin.pw)
         return ResLogin(isSuccessed=isSuccessed, ment=ment)
+    elif request.type == RequestType.signUp.value:
+        print("request SignUp")
+        reqSignUp = ReqSignUp(request, dataBytesList)
+        isSuccessed, ment = db.signUp(reqSignUp.name, reqSignUp.num, reqSignUp.pw, reqSignUp.cate)
+        return ResSignUp(isSuccessed=isSuccessed, ment=ment)
 
 def listenClient(conn : socket.socket, mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
     headerBytes, dataBytesList = receive(conn)

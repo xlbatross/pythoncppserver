@@ -20,6 +20,11 @@ class ResponseType(Enum):
     disjoinRoom = 6
     login = 7
     signUp = 8
+    proImage = 9
+    firstImage = 10
+    secondImage = 11
+    thirdImage = 12
+    forthImage = 13
 
 ####
 class Request:
@@ -71,15 +76,13 @@ class Response:
         return totalDataSize
 
 class ResImage(Response):
-    def __init__(self, img : np.ndarray, number : int):
+    def __init__(self, img : np.ndarray, number : int, imageTypeValue : int):
         super().__init__()
         self.number = number
         self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
-        self.headerBytes.extend(ResponseType.image.value.to_bytes(4, "little")) # response type
-        
+        self.headerBytes.extend(imageTypeValue.to_bytes(4, "little")) # response type
         self.dataBytesList.append(img.tobytes())
         self.dataBytesList.append(number.to_bytes(4, "little"))
-
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResRoomList(Response):
@@ -174,3 +177,22 @@ class ResSignUp(Response):
         self.dataBytesList.append(ment.encode())
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
+class ResProImage(ResImage):
+    def __init__(self, img : np.ndarray, number : int):
+        super().__init__(img, number, ResponseType.proImage.value)
+
+class ResFirstImage(ResImage):
+    def __init__(self, img : np.ndarray, number : int):
+        super().__init__(img, number, ResponseType.firstImage.value)
+
+class ResSecondImage(ResImage):
+    def __init__(self, img : np.ndarray, number : int):
+        super().__init__(img, number, ResponseType.secondImage.value)
+
+class ResThirdImage(ResImage):
+    def __init__(self, img : np.ndarray, number : int):
+        super().__init__(img, number, ResponseType.thirdImage.value)
+
+class ResForthImage(ResImage):
+    def __init__(self, img : np.ndarray, number : int):
+        super().__init__(img, number, ResponseType.forthImage.value)
