@@ -37,7 +37,7 @@ class Request:
 class ReqImage(Request):
     def __init__(self, request : Request, dataBytesList : list[bytearray]):
         super().__init__(headerBytes=request.headerBytes)
-        self.img = np.ndarray(shape=(240, 320, 3), buffer=dataBytesList[0], dtype=np.uint8)
+        self.img = np.ndarray(shape=(360, 480, 3), buffer=dataBytesList[0], dtype=np.uint8)
 
 class ReqMakeRoom(Request):
     def __init__(self, request : Request, dataBytesList : list[bytearray]):

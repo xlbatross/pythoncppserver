@@ -8,25 +8,25 @@ class TCPMultiThreadServer:
     def __init__(self, port : int = 2500, listener : int = 600):
         self.db = DB()
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
-        self.clients : dict[tuple[str, int], list[socket.socket, str, tuple]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
+        self.clients : dict[socket.socket, list[str, socket.socket]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
 
-        self.roomList : dict[tuple[str, int], tuple[str, list[tuple[str, int]]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
-        # 키는 방장 클라이언트의 어드레스(IP와 포트 번호), 밸류는 방에 존재하는 인원의 어드레스의 리스트
+        self.roomList : dict[socket.socket, tuple[str, list[socket.socket]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
         self.sock.listen(listener) # 서버 소켓을 연결 요청 대기 상태로 한다.
 
     # 접속 종료로 인한 클라이언트 정보 정리
-    def disconnect(self, cAddr : tuple):
-        if cAddr in self.roomList:
-            self.send(cAddr, ResDisjoinRoom("", isProfessorOut=True))
-        if cAddr in self.clients: # 접속을 끊은 클라이언트의 정보가 client 인스턴스 변수에 존재한다면.
-            if not self.clients[cAddr][2] is None:
-                self.send(cAddr, ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=False))
-            del self.clients[cAddr] # 클라이언트 정보 삭제
+    def disconnect(self, cSock: socket.socket):
+        if cSock in self.roomList:
+            self.send(cSock, ResDisjoinRoom("", isProfessorOut=True))
+        if cSock in self.clients: # 접속을 끊은 클라이언트의 정보가 client 인스턴스 변수에 존재한다면.
+            if not self.clients[cSock][1] is None:
+                self.send(cSock, ResDisjoinRoom(cSock.getpeername()[0] + " " + str(cSock.getpeername()[1]), isProfessorOut=False))
+            del self.clients[cSock] # 클라이언트 정보 삭제
         if len(self.clients) == 0: # 만약 서버에 연결된 클라이언트가 없다면
             self.connected = False # 서버와 연결된 클라이언트가 없는 상태임을 저장한다.
+        cSock.close() # 클라이언트와 연결된 소켓을 닫고
         print(self.clients)
         print(self.roomList)
     
@@ -34,10 +34,10 @@ class TCPMultiThreadServer:
     def accept(self):
         cSock, cAddr = self.sock.accept() # 클라이언트와 연결이 된다면 클라이언트와 연결된 소켓과 클라이언트의 어드레스(IP와 포트번호)를 반환한다.
         self.connected = True # 서버가 클라이언트와 연결된 상태임을 저장한다.
-        self.clients[cAddr] = [cSock, "", None] 
-        # client 인스턴스 변수에 클라이언트의 어드레스를 키값으로 하여 소켓과 해당 클라이언트에 로그인한 아이디를 저장한다.
+        self.clients[cSock] = ["", None]
+        # client 인스턴스 변수에 클라이언트 소켓를 키값으로 하여 소켓과 해당 클라이언트에 로그인한 아이디를 저장한다.
         # 지금은 서버로 접속만 했기 때문에 아이디 부분은 빈 부분이다.
-        # 아이디 부분 옆은 접속한 방의 방장의 어드레스이다. 지금은 아직 방에 들어가지 않았으니 None이다.
+        # 아이디 부분 옆은 접속한 방의 방장의 소켓이다. 지금은 아직 방에 들어가지 않았으니 None이다.
         return cSock, cAddr # 클라이언트와 연결된 소켓과 클리이언트의 어드레스 반환
 
     def sendByteData(self, cSock : socket.socket, data : bytearray):
@@ -49,42 +49,40 @@ class TCPMultiThreadServer:
         for dataByte in response.dataBytesList:
             self.sendByteData(cSock, dataByte)
     
-    def send(self, cAddr : tuple, response : Response):
-        cSock = self.clients[cAddr][0]
+    def send(self, cSock : socket.socket, response : Response):
         if type(response) in [ResRoomList, ResMakeRoom, ResLogin, ResSignUp]:
             self.sendData(cSock, response)
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
             if response.isEnter:
-                hostAddress = self.clients[cAddr][2]
-                resJoinRoom = ResJoinRoom(cAddr[0] + " " + str(cAddr[1]))
-                for rAddr in self.roomList[hostAddress][1]:
-                    self.sendData(self.clients[rAddr][0], resJoinRoom)
-                self.sendData(self.clients[hostAddress][0], resJoinRoom)
+                hostSocket = self.clients[cSock][1]
+                resJoinRoom = ResJoinRoom(cSock.getpeername()[0] + " " + str(cSock.getpeername()[1]))
+                for roomMemberSock in self.roomList[hostSocket][1]:
+                    self.sendData(roomMemberSock, resJoinRoom)
+                self.sendData(hostSocket, resJoinRoom)
         elif ResImage in type(response).mro():
             if response.number == 0:
-                for rAddr in self.roomList[cAddr][1]:
-                    self.sendData(self.clients[rAddr][0], response)
+                for roomMemberSock in self.roomList[cSock][1]:
+                    self.sendData(roomMemberSock, resJoinRoom)
             elif response.number > 0:
-                hostAddress = self.clients[cAddr][2]
-                self.sendData(self.clients[hostAddress][0], response)
+                hostSocket = self.clients[cSock][1]
+                self.sendData(hostSocket, response)
         elif type(response) == ResDisjoinRoom:
             if response.isProfessorOut:
-                for rAddr in self.roomList[cAddr][1]:
-                    self.clients[rAddr][2] = None
-                    self.sendData(self.clients[rAddr][0], response)
-                del self.roomList[cAddr]
+                for roomMemberSock in self.roomList[cSock][1]:
+                    self.clients[roomMemberSock][1] = None
+                    self.sendData(roomMemberSock, resJoinRoom)
+                del self.roomList[cSock]
             else:
-                hostAddress = self.clients[cAddr][2]
-                self.clients[cAddr][2] = None
-                self.roomList[hostAddress][1].remove(cAddr)
-                for rAddr in self.roomList[hostAddress][1]:
-                    self.sendData(self.clients[rAddr][0], response)
-                self.sendData(self.clients[hostAddress][0], response)
+                hostSocket = self.clients[cSock][1]
+                self.clients[cSock][1] = None
+                self.roomList[hostSocket][1].remove(cSock)
+                for roomMemberSock in self.roomList[hostSocket][1]:
+                    self.sendData(roomMemberSock, response)
+                self.sendData(hostSocket, response)
         
     # 데이터 실제 수신
     def receiveData(self, rSock : socket.socket = None):
-        cAddr = rSock.getpeername() # 데이터를 수신할 클라이언트의 어드레스
         try:
             packet = rSock.recv(4)
             if not packet: # 수신한 데이터가 없으면
@@ -100,8 +98,7 @@ class TCPMultiThreadServer:
                 receiveBytes.extend(packet)
             return receiveBytes
         except Exception as e:
-            rSock.close() # 클라이언트와 연결된 소켓을 닫고
-            self.disconnect(cAddr) # 해당 클라이언트의 정보를 해제한다.
+            self.disconnect(rSock) # 해당 클라이언트의 정보를 해제한다.
             # print(e.with_traceback())
             return None
 
@@ -147,11 +144,11 @@ class TCPMultiThreadServer:
             reqImage = ReqImage(request, dataBytesList)
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
-            if cAddr in self.roomList:
+            if cSock in self.roomList:
                 return ResProImage(image, 0)
-            elif not self.clients[cAddr][2] is None:
-                hostAddress = self.clients[cAddr][2]
-                number = self.roomList[hostAddress][1].index(cAddr) + 1
+            elif not self.clients[cSock][1] is None:
+                hostSock = self.clients[cSock][1]
+                number = self.roomList[hostSock][1].index(cSock) + 1
 
                 results = face_mesh.process(image)
 
@@ -196,8 +193,8 @@ class TCPMultiThreadServer:
             print("request Make room")
             reqMakeRoom = ReqMakeRoom(request, dataBytesList)
             isMake = False
-            if not cAddr in self.roomList:
-                self.roomList[cAddr] = (reqMakeRoom.roomName, [])
+            if not cSock in self.roomList:
+                self.roomList[cSock] = (reqMakeRoom.roomName, [])
                 isMake = True
             return ResMakeRoom(isMake)
         elif request.type == RequestType.enterRoom.value:
@@ -205,15 +202,17 @@ class TCPMultiThreadServer:
             reqEnterRoom = ReqEnterRoom(request, dataBytesList)
             hostAddress = (reqEnterRoom.ip, reqEnterRoom.port)
             isEnter = False
-            if cAddr != hostAddress and self.clients[cAddr][2] is None and len(self.roomList[hostAddress][1]) < 4:
-                self.clients[cAddr][2] = hostAddress
-                self.roomList[hostAddress][1].append(cAddr)
-                isEnter = True
+            for proSock in self.roomList:
+                if hostAddress == proSock.getpeername() and cSock.getpeername() != proSock.getpeername() and self.clients[cSock][1] is None and len(self.roomList[proSock][1]) < 1:
+                    self.clients[cSock][1] = proSock
+                    self.roomList[proSock][1].append(cSock)
+                    isEnter = True
+                    break
             return ResEnterRoom(isEnter)
         elif request.type == RequestType.leaveRoom.value:
             print("request leave room")
-            isProfessorOut = (True if cAddr in self.roomList else False)
-            return  ResDisjoinRoom(cAddr[0] + " " + str(cAddr[1]), isProfessorOut=isProfessorOut)
+            isProfessorOut = (True if cSock in self.roomList else False)
+            return  ResDisjoinRoom(cSock.getpeername()[0] + " " + str(cSock.getpeername()[1]), isProfessorOut=isProfessorOut)
         elif request.type == RequestType.login.value:
             print("request Login")
             reqLogin = ReqLogin(request, dataBytesList)

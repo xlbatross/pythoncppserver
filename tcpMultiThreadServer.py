@@ -30,7 +30,7 @@ def handler(server : TCPMultiThreadServer, cSock : socket.socket):
                 mp_drawing_styles = mp_drawing_styles
             )
             if not response is None:
-                server.send(cSock.getpeername(), response)
+                server.send(cSock, response)
 
 server = TCPMultiThreadServer(port = 2500, listener = 100) # TCPMultiThreadServer 서버 객체 생성
 
