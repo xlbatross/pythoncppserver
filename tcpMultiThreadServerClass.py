@@ -50,7 +50,7 @@ class TCPMultiThreadServer:
             self.sendByteData(cSock, dataByte)
     
     def send(self, cSock : socket.socket, response : Response):
-        if type(response) in [ResRoomList, ResMakeRoom, ResLogin, ResSignUp]:
+        if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp]:
             self.sendData(cSock, response)
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
@@ -63,7 +63,7 @@ class TCPMultiThreadServer:
         elif ResImage in type(response).mro():
             if response.number == 0:
                 for roomMemberSock in self.roomList[cSock][1]:
-                    self.sendData(roomMemberSock, resJoinRoom)
+                    self.sendData(roomMemberSock, response)
             elif response.number > 0:
                 hostSocket = self.clients[cSock][1]
                 self.sendData(hostSocket, response)
@@ -71,7 +71,7 @@ class TCPMultiThreadServer:
             if response.isProfessorOut:
                 for roomMemberSock in self.roomList[cSock][1]:
                     self.clients[roomMemberSock][1] = None
-                    self.sendData(roomMemberSock, resJoinRoom)
+                    self.sendData(roomMemberSock, response)
                 del self.roomList[cSock]
             else:
                 hostSocket = self.clients[cSock][1]
@@ -120,12 +120,11 @@ class TCPMultiThreadServer:
     # 처리된 데이터를 반환하는 함수
     def processData(self, cSock : socket.socket, headerBytes : bytearray, dataBytesList : list[bytearray], 
         mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
-        
-        cAddr = cSock.getpeername()
+    
         request = Request(headerBytes=headerBytes)
 
         print()
-        print(cAddr)
+        print(cSock.getpeername())
         print(request.receiveCount)
         print(request.type)
         print(request.totalDataSize)
