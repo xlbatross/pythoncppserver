@@ -188,7 +188,7 @@ class TCPMultiThreadServer:
                     return ResForthImage(image, number)
         elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
-            return ResRoomList(self.roomList)
+            return ResRoomList2(self.roomList)
         elif request.type == RequestType.makeRoom.value: # reqMakeRoom
             print("request Make room")
             reqMakeRoom = ReqMakeRoom(request, dataBytesList)
