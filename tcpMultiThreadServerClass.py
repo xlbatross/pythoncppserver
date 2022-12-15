@@ -50,7 +50,7 @@ class TCPMultiThreadServer:
             self.sendByteData(cSock, dataByte)
     
     def send(self, cSock : socket.socket, response : Response):
-        if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp, ResChat]:
+        if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp]:
             self.sendData(cSock, response)
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
@@ -80,6 +80,11 @@ class TCPMultiThreadServer:
                 for roomMemberSock in self.roomList[hostSocket][1]:
                     self.sendData(roomMemberSock, response)
                 self.sendData(hostSocket, response)
+        elif type(response) == ResChat:
+            hostSocket = cSock if cSock in self.roomList else self.clients[cSock][1]
+            for roomMemberSock in self.roomList[hostSocket][1]:
+                self.sendData(roomMemberSock, response)
+            self.sendData(hostSocket, response)
         
     # 데이터 실제 수신
     def receiveData(self, rSock : socket.socket = None):
@@ -227,10 +232,11 @@ class TCPMultiThreadServer:
         #가히
         elif request.type == RequestType.chat.value:
             print("request chat")
-            reqChat = ReqChat(request, dataBytesList)
-            print(reqChat.text)
-            name = self.clients[cSock][0] 
-            text = reqChat.text
-            print(name)
-            return ResChat(name,text)
+            if cSock in self.roomList or not self.clients[cSock][1] is None:
+                reqChat = ReqChat(request, dataBytesList)
+                print(reqChat.text)
+                name = self.clients[cSock][0] 
+                text = reqChat.text
+                print(name)
+                return ResChat(name,text)
             
