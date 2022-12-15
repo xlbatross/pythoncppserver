@@ -28,8 +28,6 @@ class DB:
         result = cursor.fetchone()
         if result == None:
             return "없는 학번입니다. 회원가입을 진행해주세요",""
-        # else:
-            # return True, result
         sql = f"""select * from lecture.user_info where num = "{num}" and pw = "{pw}";"""
         cursor.execute(sql)
         result = cursor.fetchone()
