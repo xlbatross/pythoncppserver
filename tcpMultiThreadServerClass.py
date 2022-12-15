@@ -52,7 +52,7 @@ class TCPMultiThreadServer:
     def send(self, cSock : socket.socket, response : Response):
         if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp, ResChat]:
             self.sendData(cSock, response)
-        elif type(response) == [ResEnterRoom]:
+        elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
             if response.isEnter:
                 hostSocket = self.clients[cSock][1]
