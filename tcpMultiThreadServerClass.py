@@ -9,9 +9,9 @@ class TCPMultiThreadServer:
         self.db = DB()
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
         self.clients : dict[socket.socket, list[str, socket.socket]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
-
+        print(self.clients)
         self.roomList : dict[socket.socket, tuple[str, list[socket.socket]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
-
+        print(self.roomList)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
         self.sock.listen(listener) # 서버 소켓을 연결 요청 대기 상태로 한다.
@@ -50,9 +50,9 @@ class TCPMultiThreadServer:
             self.sendByteData(cSock, dataByte)
     
     def send(self, cSock : socket.socket, response : Response):
-        if type(response) in [ResRoomList, ResMakeRoom, ResLogin, ResSignUp]:
+        if type(response) in [ResRoomList, ResMakeRoom, ResLogin, ResSignUp, ResChat]:
             self.sendData(cSock, response)
-        elif type(response) == ResEnterRoom:
+        elif type(response) == [ResEnterRoom]:
             self.sendData(cSock, response)
             if response.isEnter:
                 hostSocket = self.clients[cSock][1]
@@ -216,10 +216,22 @@ class TCPMultiThreadServer:
         elif request.type == RequestType.login.value:
             print("request Login")
             reqLogin = ReqLogin(request, dataBytesList)
-            isSuccessed, ment = self.db.login(reqLogin.num,reqLogin.pw)
-            return ResLogin(isSuccessed=isSuccessed, ment=ment)
+            ment,name = self.db.login(reqLogin.num,reqLogin.pw)
+            if name!="":
+                self.clients[cSock][0] = name
+            return ResLogin(ment=ment,name=name)
         elif request.type == RequestType.signUp.value:
             print("request SignUp")
             reqSignUp = ReqSignUp(request, dataBytesList)
             isSuccessed, ment = self.db.signUp(reqSignUp.name, reqSignUp.num, reqSignUp.pw, reqSignUp.cate)
             return ResSignUp(isSuccessed=isSuccessed, ment=ment)
+        #가히
+        elif request.type == RequestType.chat.value:
+            print("request chat")
+            reqChat = ReqChat(request, dataBytesList)
+            print(reqChat.text)
+            name = self.clients[cSock][0] 
+            text = reqChat.text
+            print(name)
+            return ResChat(name,text)
+            

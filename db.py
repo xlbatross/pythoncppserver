@@ -5,7 +5,7 @@ class DB:
         self.host = '127.0.0.1'
         self.port = 3306
         self.user = "root"
-        self.password = "iotiotiot"
+        self.password = "1234"
         self.dbname = "lecture"
         self.charset = "utf8"
 
@@ -27,17 +27,16 @@ class DB:
         cursor.execute(sql)
         result = cursor.fetchone()
         if result == None:
-            return False, "없는 학번입니다. 회원가입을 진행해주세요"
+            return "없는 학번입니다. 회원가입을 진행해주세요",""
         # else:
             # return True, result
-        sql = f"""select * from lecture.user_info where num = "{num}";"""
+        sql = f"""select * from lecture.user_info where num = "{num}" and pw = "{pw}";"""
         cursor.execute(sql)
         result = cursor.fetchone()
-
-        if result[2] != pw:
-            return False, "비밀번호 오류"
+        if result == None:
+            return "비밀번호 오류", ""
         else:
-            return True, "로그인 성공!"
+            return "로그인 성공!",result[0]
 
     def signUp(self,name,num,pw,cate):
         conn = self.connect()

@@ -10,6 +10,7 @@ class RequestType(Enum):
     leaveRoom = 5
     login = 6
     signUp = 7
+    chat = 8 #가히
 
 class ResponseType(Enum):
     image = 1
@@ -25,6 +26,7 @@ class ResponseType(Enum):
     secondImage = 11
     thirdImage = 12
     forthImage = 13
+    chat = 14 #가히
 
 ####
 class Request:
@@ -63,6 +65,13 @@ class ReqSignUp(Request):
         self.num = dataBytesList[1].decode()
         self.pw = dataBytesList[2].decode()
         self.cate = dataBytesList[3].decode()
+
+#가히
+class ReqChat(Request):
+    def __init__(self, request : Request, dataBytesList : list[bytearray]):
+        super().__init__(headerBytes=request.headerBytes)
+        self.text = dataBytesList[0].decode()
+
 ####
 class Response:
     def __init__(self):
@@ -160,12 +169,12 @@ class ResDisjoinRoom(Response):
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResLogin(Response):
-    def __init__(self, isSuccessed : bool, ment : str):
+    def __init__(self, ment : str, name : str):
         super().__init__()
         self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.login.value.to_bytes(4, "little")) # response type
-        self.dataBytesList.append(isSuccessed.to_bytes(4, "little"))
         self.dataBytesList.append(ment.encode())
+        self.dataBytesList.append(name.encode())
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResSignUp(Response):
@@ -196,3 +205,13 @@ class ResThirdImage(ResImage):
 class ResForthImage(ResImage):
     def __init__(self, img : np.ndarray, number : int):
         super().__init__(img, number, ResponseType.forthImage.value)
+
+#가히
+class ResChat(Response):
+    def __init__(self, name : str, text : str):
+        super().__init__()
+        self.headerBytes.extend(int(2).to_bytes(4, "little")) # receiveCount
+        self.headerBytes.extend(ResponseType.chat.value.to_bytes(4, "little")) # response type
+        self.dataBytesList.append(name.encode())
+        self.dataBytesList.append(text.encode())
+        self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
