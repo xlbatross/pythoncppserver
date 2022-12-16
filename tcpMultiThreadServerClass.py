@@ -3,6 +3,8 @@ import cv2
 from dataheader import *
 from db import DB
 from mediapipe.python.solutions import face_mesh as F, drawing_styles as D
+import predictEye
+import predictAngle
 
 
 class TCPMultiThreadServer:
@@ -14,7 +16,7 @@ class TCPMultiThreadServer:
         # ex) {클라이언트 소켓, ["아이디", 방장 소켓, 얼굴 존재 카운트 = 0, 눈깜박임 체크 카운트 = 0, 다른 방향 체크 카운트 = 0]}
 
         self.roomList : dict[socket.socket, tuple[str, list[socket.socket]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
-        print(self.roomList)
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
         self.sock.listen(listener) # 서버 소켓을 연결 요청 대기 상태로 한다.
@@ -165,8 +167,6 @@ class TCPMultiThreadServer:
                 image.flags.writeable = True
 
                 img_h, img_w, img_c = image.shape
-                face_3d = []
-                face_2d = []
 
                 if results.multi_face_landmarks:
                     face_landmarks = results.multi_face_landmarks[0]
@@ -180,64 +180,28 @@ class TCPMultiThreadServer:
                         # D.get_default_face_mesh_tesselation_style()
                     )
 
-                    for idx in [33, 263, 1, 61, 291, 199]:
-                        lm = face_landmarks.landmark[idx]
-                        x, y = int(lm.x * img_w), int(lm.y * img_h)
-                        # get the 2d coordinates
-                        face_2d.append([x, y])
-                        # get the 3d coodinates
-                        face_3d.append([x, y, lm.z])
-
-                    # Convert it to the NumPy Array
-                    face_2d = np.array(face_2d, dtype=np.float64)
-                    # Convert it to the NumPy Array
-                    face_3d = np.array(face_3d, dtype=np.float64)
-                    # the camera matrix
-                    focal_length = 1 * img_w
-
-                    cam_matrix = np.array([ [focal_length, 0, img_h / 2],
-                                            [0, focal_length, img_w / 2],
-                                            [0, 0, 1]])
-                    
-                    # The Distance Matrix
-                    dist_matrix = np.zeros((4, 1), dtype=np.float64)
-
-                    # Solve Pnp
-                    success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)
-
-                    # Get rotational matrix
-                    rmat, jac = cv2.Rodrigues(rot_vec)
-
-                    # Get angels
-                    angles, mtxR, mtxQ, Qx, Qy, Qz = cv2.RQDecomp3x3(rmat)
-
-                    # get the y rotation degree
-                    x = angles[0] * 360
-                    y = angles[1] * 360
-                    z = angles[2] * 360
-
-                    # See Where the user's head tiliing
-
-                    if y < -10:
-                        self.clients[cSock][4] += 1
-                    elif y > 10:
-                        self.clients[cSock][4] += 1
-                    elif x < -5:
-                        self.clients[cSock][4] += 1
-                    elif x > 15:
+                    if predictAngle.getPoint(face_landmarks, img_w, img_h):
                         self.clients[cSock][4] += 1
                     else:
                         self.clients[cSock][4] = 0
                     
                     self.clients[cSock][2] = 0
+                    eyeData = predictEye.blinkRatio(image, face_landmarks.landmark, predictEye.LEFT_EYE, predictEye.RIGHT_EYE)
+                    if predictEye.model.predict([[eyeData]])[0] == 'open':
+                        self.clients[cSock][3] += 1
+                    else:
+                        self.clients[cSock][3] = 0
+                    cv2.putText(image, predictEye.model.predict([[eyeData]])[0], (200, 50), cv2.FONT_HERSHEY_COMPLEX, 1.3, (255, 0 ,0), 2)
                 else:
                     self.clients[cSock][2] += 1
                 
                 color = (-1, -1, -1)
                 if self.clients[cSock][2] >= 100 and self.clients[cSock][2] % 10 > 5:
                     color = (255, 0, 0)
-                elif self.clients[cSock][4] >= 100 and self.clients[cSock][4] % 10 > 5:
+                elif self.clients[cSock][3] >= 100 and self.clients[cSock][3] % 10 > 5:
                     color = (0, 255, 0)
+                elif self.clients[cSock][4] >= 100 and self.clients[cSock][4] % 10 > 5:
+                    color = (0, 0, 255)
 
                 if color[0] != -1 and color[1] != -1 and color[2] != -1:
                     image = cv2.line(image, (0, 0), (image.shape[1], 0), color, 20)
