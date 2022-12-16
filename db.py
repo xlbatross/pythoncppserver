@@ -5,7 +5,7 @@ class DB:
         self.host = '127.0.0.1'
         self.port = 3306
         self.user = "root"
-        self.password = "iotiotiot"
+        self.password = "1234"
         self.dbname = "lecture"
         self.charset = "utf8"
 

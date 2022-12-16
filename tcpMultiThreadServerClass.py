@@ -227,6 +227,7 @@ class TCPMultiThreadServer:
             if not cSock in self.roomList:
                 self.roomList[cSock] = (reqMakeRoom.roomName, [])
                 isMake = True
+            print(self.roomList)
             return ResMakeRoom(isMake)
         elif request.type == RequestType.enterRoom.value:
             print("request Enter room")
