@@ -78,7 +78,7 @@ def sendData(conn : socket.socket, response : Response):
         sendByteData(conn, dataByte)
 
 def send(conn : socket.socket, response : Response):
-    if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin]:
+    if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp, ResChat]:
         sendData(conn, response)
     elif type(response) == ResEnterRoom:
         sendData(conn, response)
@@ -210,13 +210,18 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
     elif request.type == RequestType.login.value:
         print("request Login")
         reqLogin = ReqLogin(request, dataBytesList)
-        isSuccessed, ment = db.login(reqLogin.num,reqLogin.pw)
-        return ResLogin(isSuccessed=isSuccessed, ment=ment)
+        ment, name = db.login(reqLogin.num,reqLogin.pw)
+        return ResLogin(ment=ment, name=name)
     elif request.type == RequestType.signUp.value:
         print("request SignUp")
         reqSignUp = ReqSignUp(request, dataBytesList)
         isSuccessed, ment = db.signUp(reqSignUp.name, reqSignUp.num, reqSignUp.pw, reqSignUp.cate)
         return ResSignUp(isSuccessed=isSuccessed, ment=ment)
+    #가히
+    elif request.type == RequestType.chat.value:
+        print("request chat")
+        text = ReqChat(request, dataBytesList)
+        return ReqChat(text=text)
 
 def listenClient(conn : socket.socket, mp_face_mesh, face_mesh, mp_drawing, mp_drawing_styles):
     headerBytes, dataBytesList = receive(conn)

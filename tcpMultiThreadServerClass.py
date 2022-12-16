@@ -13,7 +13,7 @@ class TCPMultiThreadServer:
         # ex) {클라이언트 소켓, ["아이디", 방장 소켓, 눈깜박임 체크 카운트 = 0, 다른 방향 체크 카운트 = 0]}
 
         self.roomList : dict[socket.socket, tuple[str, list[socket.socket]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
-
+        print(self.roomList)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 서버 소켓 생성
         self.sock.bind(('', port)) # 서버 소켓에 어드레스(IP가 빈칸일 경우 자기 자신(127.0.0.1)로 인식한다. + 포트번호)를 지정한다. 
         self.sock.listen(listener) # 서버 소켓을 연결 요청 대기 상태로 한다.
@@ -82,6 +82,11 @@ class TCPMultiThreadServer:
                 for roomMemberSock in self.roomList[hostSocket][1]:
                     self.sendData(roomMemberSock, response)
                 self.sendData(hostSocket, response)
+        elif type(response) == ResChat:
+            hostSocket = cSock if cSock in self.roomList else self.clients[cSock][1]
+            for roomMemberSock in self.roomList[hostSocket][1]:
+                self.sendData(roomMemberSock, response)
+            self.sendData(hostSocket, response)
         
     # 데이터 실제 수신
     def receiveData(self, rSock : socket.socket = None):
@@ -258,10 +263,23 @@ class TCPMultiThreadServer:
         elif request.type == RequestType.login.value:
             print("request Login")
             reqLogin = ReqLogin(request, dataBytesList)
-            isSuccessed, ment = self.db.login(reqLogin.num,reqLogin.pw)
-            return ResLogin(isSuccessed=isSuccessed, ment=ment)
+            ment,name = self.db.login(reqLogin.num,reqLogin.pw)
+            if name!="":
+                self.clients[cSock][0] = name
+            return ResLogin(ment=ment,name=name)
         elif request.type == RequestType.signUp.value:
             print("request SignUp")
             reqSignUp = ReqSignUp(request, dataBytesList)
             isSuccessed, ment = self.db.signUp(reqSignUp.name, reqSignUp.num, reqSignUp.pw, reqSignUp.cate)
             return ResSignUp(isSuccessed=isSuccessed, ment=ment)
+        #가히
+        elif request.type == RequestType.chat.value:
+            print("request chat")
+            if cSock in self.roomList or not self.clients[cSock][1] is None:
+                reqChat = ReqChat(request, dataBytesList)
+                print(reqChat.text)
+                name = self.clients[cSock][0] 
+                text = reqChat.text
+                print(name)
+                return ResChat(name,text)
+            
