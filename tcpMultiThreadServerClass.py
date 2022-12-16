@@ -2,6 +2,7 @@ import socket
 import cv2
 from dataheader import *
 from db import DB
+from mediapipe.python.solutions import face_mesh as F, drawing_styles as D
 
 
 class TCPMultiThreadServer:
@@ -9,8 +10,8 @@ class TCPMultiThreadServer:
         self.db = DB()
         self.connected = False # 서버가 클라이언트와 연결되었는지를 판단하는 변수
         
-        self.clients : dict[socket.socket, list[str, socket.socket, int, int]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
-        # ex) {클라이언트 소켓, ["아이디", 방장 소켓, 눈깜박임 체크 카운트 = 0, 다른 방향 체크 카운트 = 0]}
+        self.clients : dict[socket.socket, list[str, socket.socket, int, int, int]] = {} # 현재 서버에 연결된 클라이언트 정보를 담는 변수
+        # ex) {클라이언트 소켓, ["아이디", 방장 소켓, 얼굴 존재 카운트 = 0, 눈깜박임 체크 카운트 = 0, 다른 방향 체크 카운트 = 0]}
 
         self.roomList : dict[socket.socket, tuple[str, list[socket.socket]]] = {} # 현재 생성된 방의 정보를 담는 변수. 
         print(self.roomList)
@@ -36,7 +37,7 @@ class TCPMultiThreadServer:
     def accept(self):
         cSock, cAddr = self.sock.accept() # 클라이언트와 연결이 된다면 클라이언트와 연결된 소켓과 클라이언트의 어드레스(IP와 포트번호)를 반환한다.
         self.connected = True # 서버가 클라이언트와 연결된 상태임을 저장한다.
-        self.clients[cSock] = ["", None, 0, 0]
+        self.clients[cSock] = ["", None, 0, 0, 0]
         # client 인스턴스 변수에 클라이언트 소켓를 키값으로 하여 소켓과 해당 클라이언트에 로그인한 아이디를 저장한다.
         # 지금은 서버로 접속만 했기 때문에 아이디 부분은 빈 부분이다.
         # 아이디 부분 옆은 접속한 방의 방장의 소켓이다. 지금은 아직 방에 들어가지 않았으니 None이다.
@@ -169,6 +170,16 @@ class TCPMultiThreadServer:
 
                 if results.multi_face_landmarks:
                     face_landmarks = results.multi_face_landmarks[0]
+                    
+                    mp_drawing.draw_landmarks(
+                        image=image,
+                        landmark_list=face_landmarks,
+                        connections=F.FACEMESH_FACE_OVAL,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp_drawing.DrawingSpec(color=(245,117,66), thickness=2)
+                        # D.get_default_face_mesh_tesselation_style()
+                    )
+
                     for idx in [33, 263, 1, 61, 291, 199]:
                         lm = face_landmarks.landmark[idx]
                         x, y = int(lm.x * img_w), int(lm.y * img_h)
@@ -208,23 +219,32 @@ class TCPMultiThreadServer:
                     # See Where the user's head tiliing
 
                     if y < -10:
-                        text = "looking left"
-                        self.clients[cSock][3] += 1
+                        self.clients[cSock][4] += 1
                     elif y > 10:
-                        text = "looking right"
-                        self.clients[cSock][3] += 1
+                        self.clients[cSock][4] += 1
                     elif x < -5:
-                        text = "looking down"
-                        self.clients[cSock][3] += 1
+                        self.clients[cSock][4] += 1
                     elif x > 15:
-                        text = "looking up"
-                        self.clients[cSock][3] += 1
+                        self.clients[cSock][4] += 1
                     else:
-                        text = "Forward"
-                        self.clients[cSock][3] = 0
+                        self.clients[cSock][4] = 0
                     
-                    if self.clients[cSock][3] >= 150:
-                        cv2.putText(image, f"alert!", (100, 300), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    self.clients[cSock][2] = 0
+                else:
+                    self.clients[cSock][2] += 1
+                
+                color = (-1, -1, -1)
+                if self.clients[cSock][2] >= 100 and self.clients[cSock][2] % 10 > 5:
+                    color = (255, 0, 0)
+                elif self.clients[cSock][4] >= 100 and self.clients[cSock][4] % 10 > 5:
+                    color = (0, 255, 0)
+
+                if color[0] != -1 and color[1] != -1 and color[2] != -1:
+                    image = cv2.line(image, (0, 0), (image.shape[1], 0), color, 20)
+                    image = cv2.line(image, (0, 0), (0, image.shape[0]), color, 20)
+                    image = cv2.line(image, (image.shape[1], 0), (image.shape[1], image.shape[0]), color, 20)
+                    image = cv2.line(image, (0, image.shape[0]), (image.shape[1], image.shape[0]), color, 20)
+                
                 if number == 1:
                     return ResFirstImage(image, number)
                 elif number == 2:
