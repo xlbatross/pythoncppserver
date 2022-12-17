@@ -27,14 +27,14 @@ class DB:
         cursor.execute(sql)
         result = cursor.fetchone()
         if result == None:
-            return "없는 학번입니다. 회원가입을 진행해주세요",""
+            return False, "없는 학번입니다. 회원가입을 진행해주세요"
         sql = f"""select * from lecture.user_info where num = "{num}" and pw = "{pw}";"""
         cursor.execute(sql)
         result = cursor.fetchone()
         if result == None:
-            return "비밀번호 오류", ""
+            return False, "비밀번호 오류"
         else:
-            return "로그인 성공!",result[0]
+            return True, "로그인 성공!"
 
     def signUp(self,name,num,pw,cate):
         conn = self.connect()
@@ -50,15 +50,17 @@ class DB:
         conn.close()
         return True, "회원가입 성공!"
 
-    def search(self, num):
+    def getName(self, num):
         conn = self.connect()
         cursor = conn.cursor() 
-        sql = f"""select * from lecture.user_info where num = "{num}";"""
+        sql = f"""select name from lecture.user_info where num = "{num}";"""
         cursor.execute(sql)
         result = cursor.fetchone()
         conn.commit()
         conn.close()
-        return result
+        if result == None:
+            return ""
+        return result[0]
         
 # stu1 = DB()
 # stu1_login = stu1.login(1234,0000)

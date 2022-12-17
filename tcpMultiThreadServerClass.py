@@ -46,8 +46,9 @@ class TCPMultiThreadServer:
         return cSock, cAddr # 클라이언트와 연결된 소켓과 클리이언트의 어드레스 반환
 
     def sendByteData(self, cSock : socket.socket, data : bytearray):
-        cSock.sendall(len(data).to_bytes(4, "little"))
-        cSock.sendall(data)
+        if cSock:
+            cSock.sendall(len(data).to_bytes(4, "little"))
+            cSock.sendall(data)
 
     def sendData(self, cSock : socket.socket, response : Response):
         self.sendByteData(cSock, response.headerBytes)
@@ -153,11 +154,11 @@ class TCPMultiThreadServer:
             reqImage = ReqImage(request, dataBytesList)
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
-            name = self.clients[cSock][0] #가히
+            userNum = self.clients[cSock][0] #가히
             state = 0
             
             if cSock in self.roomList:
-                return ResProImage(image, 0, name, state)
+                return ResProImage(image, 0, userNum, state)
             elif not self.clients[cSock][1] is None:
                 hostSock = self.clients[cSock][1]
                 number = self.roomList[hostSock][1].index(cSock) + 1
@@ -218,13 +219,13 @@ class TCPMultiThreadServer:
                     image = cv2.line(image, (0, image.shape[0]), (image.shape[1], image.shape[0]), color, 20)
                 
                 if number == 1:
-                    return ResFirstImage(image, number, name, state)
+                    return ResFirstImage(image, number, userNum, state)
                 elif number == 2:
-                    return ResSecondImage(image, number, name, state)
+                    return ResSecondImage(image, number, userNum, state)
                 elif number == 3:
-                    return ResThirdImage(image, number, name, state)
+                    return ResThirdImage(image, number, userNum, state)
                 elif number == 4:
-                    return ResForthImage(image, number, name, state)
+                    return ResForthImage(image, number, userNum, state)
         elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList2(self.roomList)
@@ -259,9 +260,11 @@ class TCPMultiThreadServer:
         elif request.type == RequestType.login.value:
             print("request Login")
             reqLogin = ReqLogin(request, dataBytesList)
-            ment,name = self.db.login(reqLogin.num,reqLogin.pw)
-            if name!="":
-                self.clients[cSock][0] = name
+            isSuccessed, ment = self.db.login(reqLogin.num,reqLogin.pw)
+            name = ""
+            if isSuccessed:
+                self.clients[cSock][0] = reqLogin.num
+                name = self.db.getName(reqLogin.num)
             return ResLogin(ment=ment,name=name)
         elif request.type == RequestType.signUp.value:
             print("request SignUp")
@@ -274,8 +277,7 @@ class TCPMultiThreadServer:
             if cSock in self.roomList or not self.clients[cSock][1] is None:
                 reqChat = ReqChat(request, dataBytesList)
                 print(reqChat.text)
-                name = self.clients[cSock][0] 
-                text = reqChat.text
+                name = self.db.getName(self.clients[cSock][0])
                 print(name)
-                return ResChat(name,text)
+                return ResChat(name,reqChat.text)
             

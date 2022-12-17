@@ -86,7 +86,7 @@ class Response:
 
 #가히
 class ResImage(Response):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int):
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int):
         super().__init__()
         self.number = number
         imageTypeValue = -1
@@ -104,7 +104,7 @@ class ResImage(Response):
         self.headerBytes.extend(imageTypeValue.to_bytes(4, "little")) # response type
         self.dataBytesList.append(img.tobytes())
         self.dataBytesList.append(number.to_bytes(4, "little"))
-        self.dataBytesList.append(name.encode())
+        self.dataBytesList.append(userNum.encode())
         self.dataBytesList.append(state.to_bytes(4,"little"))
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
@@ -201,24 +201,24 @@ class ResSignUp(Response):
         self.headerBytes.extend(self.totalDataSize().to_bytes(4, "little")) # totalDataSize
 
 class ResProImage(ResImage):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int ):
-        super().__init__(img, number, name, state)
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int ):
+        super().__init__(img, number, userNum, state)
 
 class ResFirstImage(ResImage):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int):
-        super().__init__(img, number, name, state)
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int):
+        super().__init__(img, number, userNum, state)
 
 class ResSecondImage(ResImage):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int):
-        super().__init__(img, number, name, state)
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int):
+        super().__init__(img, number, userNum, state)
 
 class ResThirdImage(ResImage):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int):
-        super().__init__(img, number, name, state)
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int):
+        super().__init__(img, number, userNum, state)
 
 class ResForthImage(ResImage):
-    def __init__(self, img : np.ndarray, number : int, name : str, state : int):
-        super().__init__(img, number, name, state)
+    def __init__(self, img : np.ndarray, number : int, userNum : str, state : int):
+        super().__init__(img, number, userNum, state)
 
 #가히
 class ResChat(Response):
