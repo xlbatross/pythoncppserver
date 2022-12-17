@@ -56,8 +56,13 @@ class TCPMultiThreadServer:
             self.sendByteData(cSock, dataByte)
     
     def send(self, cSock : socket.socket, response : Response):
-        if type(response) in [ResRoomList, ResRoomList2, ResMakeRoom, ResLogin, ResSignUp]:
+        if type(response) in [ResRoomList, ResRoomList2, ResLogin, ResSignUp]:
             self.sendData(cSock, response)
+        elif type(response) == ResMakeRoom:
+            self.sendData(cSock, response)
+            if response.isMake:
+                for sock in self.clients:
+                    self.sendData(sock, ResRoomList2(self.roomList))
         elif type(response) == ResEnterRoom:
             self.sendData(cSock, response)
             if response.isEnter:

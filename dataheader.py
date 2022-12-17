@@ -150,6 +150,7 @@ class ResRoomList2(Response):
 class ResMakeRoom(Response):
     def __init__(self, isMake : bool):
         super().__init__()
+        self.isMake = isMake
         self.headerBytes.extend(int(1).to_bytes(4, "little")) # receiveCount
         self.headerBytes.extend(ResponseType.makeRoom.value.to_bytes(4, "little")) # response type
         self.dataBytesList.append(isMake.to_bytes(4, "little"))
