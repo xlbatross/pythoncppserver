@@ -143,6 +143,7 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
             number = roomList[proSock][1].index(conn) + 1
             name = clients[conn][0] #가히
             results = face_mesh.process(image)
+            
 
             # Draw the face mesh annotations on the image.
             image.flags.writeable = True
