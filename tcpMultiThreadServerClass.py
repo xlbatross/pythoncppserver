@@ -247,6 +247,9 @@ class TCPMultiThreadServer:
                     self.clients[cSock][1] = proSock
                     self.roomList[proSock][1].append(cSock)
                     isEnter = True
+                    self.clients[cSock][2] = 0
+                    self.clients[cSock][3] = 0
+                    self.clients[cSock][4] = 0
                     break
             return ResEnterRoom(isEnter)
         elif request.type == RequestType.leaveRoom.value:
