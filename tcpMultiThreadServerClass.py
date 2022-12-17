@@ -153,12 +153,15 @@ class TCPMultiThreadServer:
             reqImage = ReqImage(request, dataBytesList)
             image = cv2.cvtColor(reqImage.img, cv2.COLOR_BGR2RGB)
             number = -1
+            name = self.clients[cSock][0] #가히
+            state = 0
+            
             if cSock in self.roomList:
-                return ResProImage(image, 0)
+                return ResProImage(image, 0, name, state)
             elif not self.clients[cSock][1] is None:
                 hostSock = self.clients[cSock][1]
                 number = self.roomList[hostSock][1].index(cSock) + 1
-
+            
                 # To improve performance
                 image.flags.writeable = False
                 # get the result
@@ -184,6 +187,7 @@ class TCPMultiThreadServer:
                         self.clients[cSock][4] += 1
                     else:
                         self.clients[cSock][4] = 0
+
                     
                     self.clients[cSock][2] = 0
                     eyeData = predictEye.blinkRatio(image, face_landmarks.landmark, predictEye.LEFT_EYE, predictEye.RIGHT_EYE)
@@ -199,10 +203,13 @@ class TCPMultiThreadServer:
                 color = (-1, -1, -1)
                 if self.clients[cSock][2] >= 100 and self.clients[cSock][2] % 10 > 5:
                     color = (255, 0, 0)
+                    state = 1
                 elif self.clients[cSock][3] >= 100 and self.clients[cSock][3] % 10 > 5:
                     color = (0, 255, 0)
+                    state = 2
                 elif self.clients[cSock][4] >= 100 and self.clients[cSock][4] % 10 > 5:
                     color = (0, 0, 255)
+                    state = 3
 
                 if color[0] != -1 and color[1] != -1 and color[2] != -1:
                     image = cv2.line(image, (0, 0), (image.shape[1], 0), color, 20)
@@ -211,13 +218,13 @@ class TCPMultiThreadServer:
                     image = cv2.line(image, (0, image.shape[0]), (image.shape[1], image.shape[0]), color, 20)
                 
                 if number == 1:
-                    return ResFirstImage(image, number)
+                    return ResFirstImage(image, number, name, state)
                 elif number == 2:
-                    return ResSecondImage(image, number)
+                    return ResSecondImage(image, number, name, state)
                 elif number == 3:
-                    return ResThirdImage(image, number)
+                    return ResThirdImage(image, number, name, state)
                 elif number == 4:
-                    return ResForthImage(image, number)
+                    return ResForthImage(image, number, name, state)
         elif request.type == RequestType.roomList.value: # reqRoomList
             print("request Room list")
             return ResRoomList2(self.roomList)

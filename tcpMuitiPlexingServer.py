@@ -141,14 +141,14 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
         elif not clients[conn][1] is None:
             proSock = clients[conn][1]
             number = roomList[proSock][1].index(conn) + 1
-
+            name = clients[conn][0] #가히
             results = face_mesh.process(image)
 
             # Draw the face mesh annotations on the image.
             image.flags.writeable = True
             if results.multi_face_landmarks:
                 face_landmarks = results.multi_face_landmarks[0]
-                
+            
                 mp_drawing.draw_landmarks(
                     image=image,
                     landmark_list=face_landmarks,
@@ -173,13 +173,13 @@ def processData(conn : socket.socket, headerBytes : bytearray, dataBytesList : l
             # cv2.imshow(str(cSock.getpeername()), image)
             # cv2.waitKey(1)
             if number == 1:
-                return ResFirstImage(image, number)
+                return ResFirstImage(image, number, name, state) #가히
             elif number == 2:
-                return ResSecondImage(image, number)
+                return ResSecondImage(image, number, name, state)
             elif number == 3:
-                return ResThirdImage(image, number)
+                return ResThirdImage(image, number, name, state)
             elif number == 4:
-                return ResForthImage(image, number)
+                return ResForthImage(image, number, name, state)
     elif request.type == RequestType.roomList.value: # reqRoomList
         print("request Room list")
         return ResRoomList2(roomList)
