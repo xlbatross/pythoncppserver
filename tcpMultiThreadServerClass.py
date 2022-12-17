@@ -84,6 +84,8 @@ class TCPMultiThreadServer:
                     self.clients[roomMemberSock][1] = None
                     self.sendData(roomMemberSock, response)
                 del self.roomList[cSock]
+                for sock in self.clients:
+                    self.sendData(sock, ResRoomList2(self.roomList))
             else:
                 hostSocket = self.clients[cSock][1]
                 self.clients[cSock][1] = None
@@ -91,8 +93,6 @@ class TCPMultiThreadServer:
                 for roomMemberSock in self.roomList[hostSocket][1]:
                     self.sendData(roomMemberSock, response)
                 self.sendData(hostSocket, response)
-            for sock in self.clients:
-                self.sendData(sock, ResRoomList2(self.roomList))
         elif type(response) == ResChat:
             hostSocket = cSock if cSock in self.roomList else self.clients[cSock][1]
             for roomMemberSock in self.roomList[hostSocket][1]:
