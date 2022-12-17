@@ -46,9 +46,11 @@ class TCPMultiThreadServer:
         return cSock, cAddr # 클라이언트와 연결된 소켓과 클리이언트의 어드레스 반환
 
     def sendByteData(self, cSock : socket.socket, data : bytearray):
-        if cSock:
+        try:
             cSock.sendall(len(data).to_bytes(4, "little"))
             cSock.sendall(data)
+        except Exception as e:
+            print(e)
 
     def sendData(self, cSock : socket.socket, response : Response):
         self.sendByteData(cSock, response.headerBytes)
@@ -204,7 +206,6 @@ class TCPMultiThreadServer:
                         self.clients[cSock][3] += 1
                     else:
                         self.clients[cSock][3] = 0
-                    cv2.putText(image, predictEyeData, (200, 50), cv2.FONT_HERSHEY_COMPLEX, 1.3, (255, 0 ,0), 2)
                 else:
                     self.clients[cSock][2] += 1
                 
