@@ -69,7 +69,7 @@ class TCPMultiThreadServer:
             self.sendData(cSock, response)
             if response.isEnter:
                 hostSocket = self.clients[cSock][1]
-                resJoinRoom = ResJoinRoom(cSock.getpeername()[0] + " " + str(cSock.getpeername()[1]))
+                resJoinRoom = ResJoinRoom(self.db.getName(self.clients[cSock][0]) + "(" + cSock.getpeername()[0] + ")")
                 for roomMemberSock in self.roomList[hostSocket][1]:
                     self.sendData(roomMemberSock, resJoinRoom)
                 self.sendData(hostSocket, resJoinRoom)
@@ -264,7 +264,7 @@ class TCPMultiThreadServer:
         elif request.type == RequestType.leaveRoom.value:
             print("request leave room")
             isProfessorOut = (True if cSock in self.roomList else False)
-            return  ResDisjoinRoom(cSock.getpeername()[0] + " " + str(cSock.getpeername()[1]), isProfessorOut=isProfessorOut)
+            return ResDisjoinRoom(self.db.getName(self.clients[cSock][0]) + "(" + cSock.getpeername()[0] + ")", isProfessorOut=isProfessorOut)
         elif request.type == RequestType.login.value:
             print("request Login")
             reqLogin = ReqLogin(request, dataBytesList)
@@ -287,5 +287,5 @@ class TCPMultiThreadServer:
                 print(reqChat.text)
                 name = self.db.getName(self.clients[cSock][0])
                 print(name)
-                return ResChat(name,reqChat.text)
+                return ResChat(name + "(" + cSock.getpeername()[0] + ")",reqChat.text)
             
