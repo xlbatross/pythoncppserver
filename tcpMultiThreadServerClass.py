@@ -187,11 +187,12 @@ class TCPMultiThreadServer:
                     
                     self.clients[cSock][2] = 0
                     eyeData = predictEye.blinkRatio(image, face_landmarks.landmark, predictEye.LEFT_EYE, predictEye.RIGHT_EYE)
-                    if predictEye.model.predict([[eyeData]])[0] == 'open':
+                    predictEyeData = predictEye.model.predict([[eyeData]])[0]
+                    if predictEyeData == 'close':
                         self.clients[cSock][3] += 1
                     else:
                         self.clients[cSock][3] = 0
-                    cv2.putText(image, predictEye.model.predict([[eyeData]])[0], (200, 50), cv2.FONT_HERSHEY_COMPLEX, 1.3, (255, 0 ,0), 2)
+                    cv2.putText(image, predictEyeData, (200, 50), cv2.FONT_HERSHEY_COMPLEX, 1.3, (255, 0 ,0), 2)
                 else:
                     self.clients[cSock][2] += 1
                 
